@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Versioning;
 using Microsoft.Data.Sqlite;
 using McSsCheck.Data;
+using McSsCheck.Models;
 using McSsCheck.Util;
 
 namespace McSsCheck.Scanners;
@@ -12,19 +13,19 @@ namespace McSsCheck.Scanners;
 [SupportedOSPlatform("windows")]
 internal static class BrowserHistoryScanner
 {
-    public static void Run()
+    public const string SourceName = "BrowserHistoryScanner";
+
+    public static void Run(SessionReport.Section section)
     {
         ConsoleUI.Section("Browser history (cheat-client domains only)");
-
-        ScanChromiumLikeHistory();
-        ScanFirefoxHistory();
+        ScanChromiumLikeHistory(section);
+        ScanFirefoxHistory(section);
     }
 
-    private static void ScanChromiumLikeHistory()
+    private static void ScanChromiumLikeHistory(SessionReport.Section section)
     {
         var localAppdata = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        // Chrome / Edge / Brave / Opera / Vivaldi profiles.
         var browserBases = new[]
         {
             Path.Combine(localAppdata, "Google",  "Chrome",         "User Data"),
@@ -38,7 +39,6 @@ internal static class BrowserHistoryScanner
         {
             if (!Directory.Exists(basePath)) continue;
 
-            // Collect all profile dirs that have a History sqlite db.
             IEnumerable<string> histDbs;
             if (File.Exists(Path.Combine(basePath, "History")))
                 histDbs = new[] { Path.Combine(basePath, "History") };
@@ -48,15 +48,12 @@ internal static class BrowserHistoryScanner
                     .Where(File.Exists);
 
             foreach (var db in histDbs)
-            {
-                ScanChromiumDb(basePath, db);
-            }
+                ScanChromiumDb(basePath, db, section);
         }
     }
 
-    private static void ScanChromiumDb(string browserBase, string historyDb)
+    private static void ScanChromiumDb(string browserBase, string historyDb, SessionReport.Section section)
     {
-        // Copy because Chrome locks the file while running.
         string tmp;
         try
         {
@@ -66,6 +63,10 @@ internal static class BrowserHistoryScanner
         catch (Exception ex)
         {
             ConsoleUI.Warn($"  cannot copy {historyDb} ({ex.Message}). Close the browser and re-run.");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Warn,
+                Title: "Browser history DB locked",
+                Detail: $"{historyDb}: {ex.Message}", FilePath: historyDb));
             return;
         }
 
@@ -87,6 +88,11 @@ internal static class BrowserHistoryScanner
 
                 hits++;
                 ConsoleUI.Hit($"  {browserBase}: domain hits [{string.Join(",", matched)}]: {url}  ({title})");
+                section.Add(new ScanResult(
+                    Source: SourceName, Severity: Severity.Hit,
+                    Title: "Cheat-client domain in browser history",
+                    Detail: $"{browserBase}\nurl={url}\ntitle={title}\nmatched: {string.Join(", ", matched)}",
+                    FilePath: historyDb, Tags: matched.ToArray()));
             }
             if (hits == 0) ConsoleUI.Ok($"{browserBase}: no cheat-client domains in history.");
         }
@@ -100,7 +106,7 @@ internal static class BrowserHistoryScanner
         }
     }
 
-    private static void ScanFirefoxHistory()
+    private static void ScanFirefoxHistory(SessionReport.Section section)
     {
         var ffRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -142,6 +148,11 @@ internal static class BrowserHistoryScanner
 
                     hits++;
                     ConsoleUI.Hit($"  Firefox {Path.GetFileName(profile)}: domain hits [{string.Join(",", matched)}]: {url}  ({title})");
+                    section.Add(new ScanResult(
+                        Source: SourceName, Severity: Severity.Hit,
+                        Title: "Cheat-client domain in Firefox history",
+                        Detail: $"profile={Path.GetFileName(profile)}\nurl={url}\ntitle={title}\nmatched: {string.Join(", ", matched)}",
+                        FilePath: places, Tags: matched.ToArray()));
                 }
                 if (hits == 0) ConsoleUI.Ok($"Firefox profile {Path.GetFileName(profile)}: no cheat-client domains.");
             }

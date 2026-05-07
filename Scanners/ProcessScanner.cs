@@ -6,6 +6,7 @@ using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using McSsCheck.Data;
+using McSsCheck.Models;
 using McSsCheck.Util;
 
 namespace McSsCheck.Scanners;
@@ -13,11 +14,13 @@ namespace McSsCheck.Scanners;
 [SupportedOSPlatform("windows")]
 internal static class ProcessScanner
 {
-    public static void Run()
+    public const string SourceName = "ProcessScanner";
+
+    public static void Run(SessionReport.Section section)
     {
         ConsoleUI.Section("Running Java / Minecraft processes");
 
-        var entries = QueryJavaProcesses().ToList();
+        var entries = QueryJavaProcesses(section).ToList();
         if (entries.Count == 0)
         {
             ConsoleUI.Ok("No java.exe / javaw.exe processes are currently running.");
@@ -30,35 +33,53 @@ internal static class ProcessScanner
             if (!string.IsNullOrEmpty(p.CommandLine))
                 ConsoleUI.Dim($"  cmdline: {Truncate(p.CommandLine, 400)}");
 
-            // Flag suspicious -javaagent
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Info,
+                Title: $"PID {p.Pid} {p.Name}",
+                Detail: $"exe={p.ExePath}\ncmdline={p.CommandLine}"));
+
             foreach (var agent in ExtractJavaAgents(p.CommandLine))
             {
-                if (LooksSuspiciousAgentPath(agent))
-                    ConsoleUI.Hit($"  -javaagent path looks unusual: {agent}");
-                else
-                    ConsoleUI.Warn($"  -javaagent: {agent}");
+                bool sus = LooksSuspiciousAgentPath(agent);
+                if (sus) ConsoleUI.Hit($"  -javaagent path looks unusual: {agent}");
+                else     ConsoleUI.Warn($"  -javaagent: {agent}");
+                section.Add(new ScanResult(
+                    Source: SourceName,
+                    Severity: sus ? Severity.Hit : Severity.Warn,
+                    Title: sus ? "Suspicious -javaagent path" : "-javaagent declared",
+                    Detail: $"PID {p.Pid}: -javaagent:{agent}",
+                    FilePath: agent,
+                    Tags: new[] { "javaagent" }));
             }
 
-            // Flag jars on cmdline that match known cheat keywords
             foreach (var token in TokenizeCmdline(p.CommandLine))
             {
-                if (token.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
-                {
-                    var hits = KnownCheats.MatchKeywords(token, KnownCheats.NameKeywords).ToList();
-                    if (hits.Count > 0)
-                        ConsoleUI.Hit($"  jar on cmdline matches cheat keyword(s) [{string.Join(",", hits)}]: {token}");
-                }
+                if (!token.EndsWith(".jar", StringComparison.OrdinalIgnoreCase)) continue;
+                var hits = KnownCheats.MatchKeywords(token, KnownCheats.NameKeywords).ToList();
+                if (hits.Count == 0) continue;
+                ConsoleUI.Hit($"  jar on cmdline matches cheat keyword(s) [{string.Join(",", hits)}]: {token}");
+                section.Add(new ScanResult(
+                    Source: SourceName, Severity: Severity.Hit,
+                    Title: "Cmdline jar matches cheat keyword",
+                    Detail: $"PID {p.Pid} cmdline jar '{token}' matched: {string.Join(", ", hits)}",
+                    FilePath: token,
+                    Tags: hits.ToArray()));
             }
 
-            // Loaded modules (DLLs) — flag obviously off-path DLLs
             try
             {
                 using var proc = Process.GetProcessById(p.Pid);
                 foreach (ProcessModule mod in proc.Modules)
                 {
                     var path = mod.FileName ?? string.Empty;
-                    if (LooksSuspiciousModulePath(path))
-                        ConsoleUI.Hit($"  loaded module from unusual path: {path}");
+                    if (!LooksSuspiciousModulePath(path)) continue;
+                    ConsoleUI.Hit($"  loaded module from unusual path: {path}");
+                    section.Add(new ScanResult(
+                        Source: SourceName, Severity: Severity.Hit,
+                        Title: "DLL loaded from unusual path",
+                        Detail: $"PID {p.Pid} loaded {path}",
+                        FilePath: path,
+                        Tags: new[] { "module-injection" }));
                 }
             }
             catch (Exception ex)
@@ -70,9 +91,8 @@ internal static class ProcessScanner
 
     private record ProcEntry(int Pid, string Name, string? ExePath, string? CommandLine);
 
-    private static IEnumerable<ProcEntry> QueryJavaProcesses()
+    private static IEnumerable<ProcEntry> QueryJavaProcesses(SessionReport.Section section)
     {
-        // WMI gives us the full command line, which Process API does not.
         const string query = "SELECT ProcessId, Name, ExecutablePath, CommandLine FROM Win32_Process " +
                              "WHERE Name = 'java.exe' OR Name = 'javaw.exe'";
 
@@ -85,6 +105,10 @@ internal static class ProcessScanner
         catch (Exception ex)
         {
             ConsoleUI.Error($"WMI query failed: {ex.Message}");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Error,
+                Title: "WMI query failed",
+                Detail: ex.Message));
             yield break;
         }
 
@@ -140,7 +164,6 @@ internal static class ProcessScanner
         if (string.IsNullOrEmpty(modulePath)) return false;
         var lowered = modulePath.ToLowerInvariant();
 
-        // Whitelist obviously normal locations.
         if (lowered.Contains("\\windows\\system32\\")) return false;
         if (lowered.Contains("\\windows\\syswow64\\")) return false;
         if (lowered.Contains("\\program files\\")) return false;
@@ -150,12 +173,10 @@ internal static class ProcessScanner
         if (lowered.Contains("\\runtime\\")) return false;
         if (lowered.Contains("\\microsoft\\")) return false;
 
-        // Otherwise, flag DLLs from unusual paths.
         if (lowered.EndsWith(".dll"))
         {
             string[] sus = { "\\temp\\", "\\downloads\\", "\\desktop\\", "\\users\\public\\", "\\appdata\\local\\temp\\" };
             foreach (var s in sus) if (lowered.Contains(s)) return true;
-            // Generic catch: DLL not under any known runtime folder.
             return true;
         }
         return false;

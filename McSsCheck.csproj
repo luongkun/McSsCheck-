@@ -19,7 +19,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishReadyToRun>false</PublishReadyToRun>
 
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>McSsCheck</Product>
     <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only.</Description>
   </PropertyGroup>
@@ -27,6 +27,7 @@
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.7" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.1" />
   </ItemGroup>
 
 </Project>
