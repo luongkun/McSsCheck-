@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore McSsCheck.csproj
+
+      - name: Build (Release)
+        run: dotnet build McSsCheck.csproj -c Release --no-restore --warnaserror
+
+      - name: Publish single-file win-x64
+        run: dotnet publish McSsCheck.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Verify exe exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path publish/McSsCheck.exe)) { throw "McSsCheck.exe missing" }
+          Get-Item publish/McSsCheck.exe | Select-Object Name, Length, LastWriteTime
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: McSsCheck-win-x64
+          path: publish/McSsCheck.exe
+          if-no-files-found: error
