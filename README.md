@@ -11,13 +11,30 @@ console and as a self-contained HTML file in the user's `%TEMP%` folder.
 
 ## What it scans
 
+- **PC information** (new in v0.3.0) — Windows version + build, last
+  boot time, install date, locale / country, CPU / GPU / RAM / disks,
+  last `javaw.exe` / Minecraft launcher prefetch entry, last write time
+  inside `$Recycle.Bin`, **VPN heuristic** (TAP-Windows / WireGuard /
+  OpenVPN / NordVPN / etc. adapters and services), and Discord install
+  presence (variant + version + running). The Discord check **only**
+  looks at the install folder; it never opens leveldb / chats / tokens.
 - **Running `java.exe` / `javaw.exe` processes** — command line (incl. JVM
   args like `-javaagent:`), loaded DLLs, jars on the cmdline.
 - **`%APPDATA%\.minecraft`** — `mods/`, `versions/`, `launcher_profiles.json`,
-  `resourcepacks/`. Hashes (SHA-256) every jar, flags filenames and internal
-  entries that match known cheat keywords, and runs a **packed-jar heuristic**
-  (Shannon entropy + ProGuard/Allatori/Stringer/Zelix markers + ratio of
-  1–2 character class names).
+  `resourcepacks/`. Hashes (SHA-256 + SHA-1) every jar, flags filenames and
+  internal entries that match known cheat keywords, and runs a **packed-jar
+  heuristic** (Shannon entropy + ProGuard/Allatori/Stringer/Zelix markers
+  + ratio of 1–2 character class names).
+- **Mod registry verification (Modrinth)** (new in v0.3.0) — submits the
+  SHA-1 of every mod jar to the public [Modrinth](https://modrinth.com)
+  API in a single batch. Recognised jars are tagged **VERIFIED** with the
+  registry project / download URL; unknown jars are tagged **NOT
+  VERIFIED** for staff to look at more carefully. **Hashes only — never
+  the file.** Disable with `--no-modrinth`.
+- **Alternative Minecraft accounts** (new in v0.3.0) — parses launcher
+  profile files for vanilla launcher, TLauncher, Lunar Client, Feather
+  Client, Badlion Client, Prism / MultiMC. Only username / UUID / type
+  are extracted — **no auth tokens**.
 - **`$Recycle.Bin`** — only `.jar`, `.exe`, `.bat`, `.class` files.
 - **`C:\Windows\Prefetch`** — only entries that start with `java.exe-`,
   `javaw.exe-`, or contain `minecraft`/`launcher`.
@@ -37,12 +54,17 @@ console and as a self-contained HTML file in the user's `%TEMP%` folder.
   is sent — never the file**, and the step is rate-limited and capped per
   session. No key → step is skipped entirely.
 
+The HTML report groups every result into Ocean-style buckets: **Detects**
+(`HIT` rows), **Integrity** (`OK` rows from passed checks), **Warnings**
+(`WARN`), **Suspicious** (`INFO` worth a look) and **Backstage** (entries
+explicitly tagged `backstage`).
+
 ## What it does NOT do
 
-- **No network traffic by default.** The only outbound traffic possible
-  is the optional VirusTotal hash lookup, which requires the staff member
-  to explicitly pass `--vt-key` (or `VT_API_KEY`). Disable it any time
-  with `--no-vt`.
+- **Minimal network traffic, all opt-out.** By default the only outbound
+  calls are the **Modrinth hash verification** (keyless, hash-only;
+  disable with `--no-modrinth`) and the **optional VirusTotal lookup**
+  (requires `--vt-key`; disable with `--no-vt`).
 - **No telemetry, no upload, no exfiltration.**
 - **No persistence**, no autostart, no scheduled task, no service install.
 - **No reading** of passwords, saved logins, cookies, sessions, documents,
@@ -93,6 +115,9 @@ dotnet publish -c Release -r win-x64 -o publish
 ```
 McSsCheck.exe                       # interactive scan with consent prompt
 McSsCheck.exe -y                    # skip prompt (only for automated reruns)
+McSsCheck.exe --no-pcinfo           # skip PC information panel
+McSsCheck.exe --no-accounts         # skip alternative Minecraft account scan
+McSsCheck.exe --no-modrinth         # skip Modrinth jar verification (offline mode)
 McSsCheck.exe --no-browser          # skip browser history scan
 McSsCheck.exe --no-recycle          # skip Recycle Bin scan
 McSsCheck.exe --no-registry         # skip registry scan
@@ -125,6 +150,26 @@ McSsCheck.exe --help                # show all flags
    the hash is sent — never the file**. Free-tier keys are limited to
    ~4 req/min and 500/day, so the tool throttles itself and caps at 24
    lookups per session.
+
+## What's new in v0.3.0
+
+- **PC Information panel** — OS version, boot time, install date,
+  locale / country, CPU / GPU / RAM / disks, last game launch, last
+  Recycle Bin entry, VPN heuristic, Discord install presence.
+- **Detection categorisation** — results are now grouped into
+  Detects / Integrity / Warnings / Suspicious / Backstage (Ocean-style)
+  in the HTML report, with per-category count tiles and collapsible
+  detail lists.
+- **Alternative Minecraft accounts** — discovers accounts from vanilla
+  launcher, TLauncher, Lunar Client, Feather Client, Badlion Client,
+  and Prism / MultiMC profile files.
+- **Mod registry verification (Modrinth)** — batch SHA-1 lookup against
+  Modrinth to tag each mod jar as VERIFIED or NOT VERIFIED.
+- **VPN heuristic** — flags TAP-Windows, WireGuard, OpenVPN, NordVPN,
+  ExpressVPN, and 10+ other VPN adapter / service names.
+- **Discord install detection** — detects Discord / Canary / PTB /
+  Development variants, version, and running status. Does NOT read
+  tokens, leveldb, or chat data.
 
 ## What's new in v0.2.0
 

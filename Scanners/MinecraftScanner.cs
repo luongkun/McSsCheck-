@@ -19,10 +19,11 @@ internal static class MinecraftScanner
     public static Dictionary<string, (string Sha256, long Size)> JarHashes { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public static void Run(SessionReport.Section section)
+    public static void Run(SessionReport report, SessionReport.Section section)
     {
         ConsoleUI.Section("Minecraft installations and mods");
         JarHashes.Clear();
+        report.Mods.Clear();
 
         var roots = FindMinecraftRoots().ToList();
         if (roots.Count == 0)
@@ -38,8 +39,8 @@ internal static class MinecraftScanner
                 Source: SourceName, Severity: Severity.Info,
                 Title: "Minecraft folder found", Detail: root, FilePath: root));
 
-            ScanMods(Path.Combine(root, "mods"), section);
-            ScanLibrariesAndVersions(root, section);
+            ScanMods(Path.Combine(root, "mods"), report, section);
+            ScanLibrariesAndVersions(root, report, section);
             ScanLauncherProfiles(root, section);
             ScanResourcePacks(Path.Combine(root, "resourcepacks"), section);
         }
@@ -74,7 +75,7 @@ internal static class MinecraftScanner
         }
     }
 
-    private static void ScanMods(string modsDir, SessionReport.Section section)
+    private static void ScanMods(string modsDir, SessionReport report, SessionReport.Section section)
     {
         if (!Directory.Exists(modsDir))
         {
@@ -85,10 +86,10 @@ internal static class MinecraftScanner
         var jars = Directory.EnumerateFiles(modsDir, "*.jar", SearchOption.AllDirectories).ToList();
         ConsoleUI.Info($"  mods/ contains {jars.Count} jar(s)");
 
-        foreach (var jar in jars) InspectJar(jar, section);
+        foreach (var jar in jars) InspectJar(jar, report, section);
     }
 
-    private static void ScanLibrariesAndVersions(string mcRoot, SessionReport.Section section)
+    private static void ScanLibrariesAndVersions(string mcRoot, SessionReport report, SessionReport.Section section)
     {
         var versionsDir = Path.Combine(mcRoot, "versions");
         if (!Directory.Exists(versionsDir)) return;
@@ -108,7 +109,7 @@ internal static class MinecraftScanner
             }
 
             foreach (var jar in Directory.EnumerateFiles(dir, "*.jar", SearchOption.TopDirectoryOnly))
-                InspectJar(jar, section);
+                InspectJar(jar, report, section);
         }
     }
 
@@ -157,7 +158,7 @@ internal static class MinecraftScanner
         }
     }
 
-    private static void InspectJar(string jarPath, SessionReport.Section section)
+    private static void InspectJar(string jarPath, SessionReport report, SessionReport.Section section)
     {
         var fileName = Path.GetFileName(jarPath);
         var nameHits = KnownCheats.MatchKeywords(fileName, KnownCheats.NameKeywords).ToList();
@@ -176,16 +177,27 @@ internal static class MinecraftScanner
         catch { return; }
 
         string? sha = null;
+        string? sha1 = null;
         try
         {
-            sha = HashUtil.Sha256OfFile(jarPath);
+            (sha, sha1) = HashUtil.Sha256AndSha1OfFile(jarPath);
             JarHashes[jarPath] = (sha, fi.Length);
-            ConsoleUI.Dim($"    {fileName}  size={fi.Length}  sha256={sha}  mtime={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
+            ConsoleUI.Dim($"    {fileName}  size={fi.Length}  sha1={sha1}  sha256={sha}  mtime={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
         }
         catch (Exception ex)
         {
             ConsoleUI.Dim($"    {fileName}  (hash failed: {ex.Message})");
         }
+
+        report.Mods.Add(new ModEntry
+        {
+            FileName = fileName,
+            FilePath = jarPath,
+            Size     = fi.Length,
+            Modified = fi.LastWriteTime,
+            Sha1     = sha1,
+            Sha256   = sha,
+        });
 
         try
         {

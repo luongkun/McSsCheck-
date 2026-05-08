@@ -19,9 +19,9 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishReadyToRun>false</PublishReadyToRun>
 
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Product>McSsCheck</Product>
-    <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only.</Description>
+    <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only (with optional Modrinth / VirusTotal hash verification).</Description>
   </PropertyGroup>
 
   <ItemGroup>
