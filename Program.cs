@@ -12,7 +12,7 @@ namespace McSsCheck;
 [SupportedOSPlatform("windows")]
 internal static class Program
 {
-    private const string Version = "0.4.0";
+    private const string Version = "0.5.0";
 
     private static async Task<int> Main(string[] args)
     {
@@ -34,6 +34,8 @@ internal static class Program
         bool noPcInfo       = false;
         bool noAccounts     = false;
         bool noModrinth     = false;
+        bool noLiveJvm      = false;
+        bool noEngines      = false;
         bool reportOnly     = false;
         string? vtKey       = Environment.GetEnvironmentVariable("VT_API_KEY");
         string? htmlPathArg = null;
@@ -56,6 +58,8 @@ internal static class Program
                 case "--no-pcinfo":   noPcInfo     = true; break;
                 case "--no-accounts": noAccounts   = true; break;
                 case "--no-modrinth": noModrinth   = true; break;
+                case "--no-livejvm":  noLiveJvm    = true; break;
+                case "--no-engines":  noEngines    = true; break;
                 case "--report-only": reportOnly   = true; break;
                 case "--vt-key":
                     if (i + 1 < args.Length) vtKey = args[++i];
@@ -81,10 +85,11 @@ internal static class Program
             "Local-only. Network calls are OPTIONAL: Modrinth hash verification (--no-modrinth disables)\n" +
             "and VirusTotal hash lookup (only if you provide --vt-key). No file writes except an HTML\n" +
             "report under your %TEMP% folder. No persistence.\n" +
-            "Read-only checks: PC info, Java/Minecraft processes, .minecraft, $Recycle.Bin, Prefetch,\n" +
-            "registry MUICache+Run keys, browser history (cheat domains only), NTFS USN journal (admin),\n" +
-            "Defender event log + DetectionHistory (admin), packed-jar heuristic, alt MC accounts on disk,\n" +
-            "Discord install presence (NOT chat / token data).\n" +
+            "Read-only checks: PC info, Java/Minecraft processes, LIVE JVM classpath (jars Minecraft is\n" +
+            "loading right now), .minecraft, $Recycle.Bin, Prefetch, registry MUICache+Run keys, browser\n" +
+            "history (cheat domains only), NTFS USN journal (admin), Defender event log + DetectionHistory\n" +
+            "(admin), packed-jar heuristic, ADS / SelfDestruct / event-log-cleared engines,\n" +
+            "alt MC accounts on disk, Discord install presence (NOT chat / token data).\n" +
             "Source: open. License: MIT.");
 
         if (!autoYes)
@@ -104,6 +109,8 @@ internal static class Program
         if (!noPcInfo)
             await RunSection(report, "PC information",                    s => SystemInfoScanner.Run(report, s));
         await RunSection(report, "Java / Minecraft processes",            s => ProcessScanner.Run(s));
+        if (!noLiveJvm)
+            await RunSection(report, "Live JVM classpath",                s => LiveJvmScanner.Run(report, s));
         await RunSection(report, "Minecraft installations and mods",      s => MinecraftScanner.Run(report, s));
         if (!noAccounts)
             await RunSection(report, "Alternative Minecraft accounts",    s => AltAccountScanner.Run(report, s));
@@ -119,6 +126,8 @@ internal static class Program
             await RunSection(report, "NTFS USN journal (deleted files)",  s => UsnJournalScanner.Run(s));
         if (!noDefender)
             await RunSection(report, "Windows Defender history",          s => DefenderLogScanner.Run(s));
+        if (!noEngines)
+            await RunSection(report, "Heuristic engines",                 s => HeuristicEngineScanner.Run(report, s));
 
         {
             var sec = report.StartSection("Mods registry verification (Modrinth)");
@@ -186,6 +195,8 @@ internal static class Program
         Console.WriteLine("  --no-pcinfo        skip PC information panel (system / hardware / VPN / Discord install)");
         Console.WriteLine("  --no-accounts      skip alternative Minecraft account scan");
         Console.WriteLine("  --no-modrinth      skip Modrinth jar verification (offline-only mode)");
+        Console.WriteLine("  --no-livejvm       skip live JVM classpath inspection");
+        Console.WriteLine("  --no-engines       skip heuristic engines (SelfDestruct / Bypass / ADS)");
         Console.WriteLine("  --no-browser       skip browser-history scan");
         Console.WriteLine("  --no-recycle       skip Recycle Bin scan");
         Console.WriteLine("  --no-registry      skip registry scan");

@@ -13,7 +13,7 @@ public sealed class SessionReport
     public string Hostname { get; init; } = Environment.MachineName;
     public string Username { get; init; } = Environment.UserName;
     public string OsVersion { get; init; } = Environment.OSVersion.ToString();
-    public string ToolVersion { get; init; } = "0.4.0";
+    public string ToolVersion { get; init; } = "0.5.0";
     public DateTime StartedAt { get; init; } = DateTime.Now;
     public DateTime? FinishedAt { get; set; }
 
