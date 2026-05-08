@@ -1,94 +1,24 @@
-using System;
-
 namespace McSsCheck.Util;
 
+/// <summary>
+/// Static facade scanners use to print severity-tinted text. Internally
+/// delegates to whatever <see cref="IUiSink"/> the host installed (console
+/// in <c>--console</c> mode, GUI in default mode).
+/// </summary>
 internal static class ConsoleUI
 {
-    private static readonly object _lock = new();
+    /// <summary>
+    /// Active sink. Default = console output. The GUI host replaces this
+    /// at startup before any scanner runs.
+    /// </summary>
+    public static IUiSink Sink { get; set; } = new ConsoleUiSink();
 
-    public static void Banner(string title)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine();
-            Console.WriteLine(new string('=', 78));
-            Console.WriteLine($" {title}");
-            Console.WriteLine(new string('=', 78));
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Section(string title)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine();
-            Console.WriteLine($"--- {title} ---");
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Info(string text)
-    {
-        lock (_lock) { Console.WriteLine($"  {text}"); }
-    }
-
-    public static void Ok(string text)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"  [OK] {text}");
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Warn(string text)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"  [!]  {text}");
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Hit(string text)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  [HIT] {text}");
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Error(string text)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  [ERR] {text}");
-            Console.ForegroundColor = prev;
-        }
-    }
-
-    public static void Dim(string text)
-    {
-        lock (_lock)
-        {
-            var prev = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  {text}");
-            Console.ForegroundColor = prev;
-        }
-    }
+    public static void Banner(string title) => Sink.Banner(title);
+    public static void Section(string title) => Sink.Section(title);
+    public static void Info(string text)    => Sink.Info(text);
+    public static void Ok(string text)      => Sink.Ok(text);
+    public static void Warn(string text)    => Sink.Warn(text);
+    public static void Hit(string text)     => Sink.Hit(text);
+    public static void Error(string text)   => Sink.Error(text);
+    public static void Dim(string text)     => Sink.Dim(text);
 }

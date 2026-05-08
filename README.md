@@ -1,9 +1,11 @@
 # McSsCheck
 
-A small Windows console tool that helps server staff run a **consensual** Minecraft
+A small Windows tool that helps server staff run a **consensual** Minecraft
 screenshare (SS) session: it inspects the local machine for well-known
-Minecraft Java cheat-client artifacts and prints a report — both to the
-console and as a self-contained HTML file in the user's `%TEMP%` folder.
+Minecraft Java cheat-client artifacts and writes a report — to a colored
+window with a progress bar, and to a self-contained HTML file in the
+user's `%TEMP%` folder. A legacy `--console` mode is still shipped for
+SS workflows that prefer streaming stdout.
 
 > **This is a forensic helper, not a verdict.** Every `[HIT]` line should be
 > reviewed with the player. Cheat-client *names* and *domains* show up in
@@ -134,8 +136,11 @@ dotnet publish -c Release -r win-x64 -o publish
 ## Usage
 
 ```
-McSsCheck.exe                       # interactive scan with consent prompt
-McSsCheck.exe -y                    # skip prompt (only for automated reruns)
+McSsCheck.exe                       # GUI mode (default) — opens a window with a
+                                    # progress bar, colored log and "Start scan"
+                                    # / "Cancel" / "Open HTML report" buttons.
+McSsCheck.exe --console             # legacy stdin/stdout console mode
+McSsCheck.exe --console -y          # console mode, skip consent prompt
 McSsCheck.exe --no-pcinfo           # skip PC information panel
 McSsCheck.exe --no-accounts         # skip alternative Minecraft account scan
 McSsCheck.exe --no-modrinth         # skip Modrinth jar verification (offline mode)
@@ -174,6 +179,28 @@ McSsCheck.exe --help                # show all flags
    the hash is sent — never the file**. Free-tier keys are limited to
    ~4 req/min and 500/day, so the tool throttles itself and caps at 24
    lookups per session.
+
+## What's new in v0.7.0
+
+- **Windows Forms GUI as default mode.** Double-clicking
+  `McSsCheck.exe` now opens a real window with a progress bar,
+  colored severity-tinted log (HIT red / WARN yellow / OK green /
+  INFO blue) and **Start / Cancel / Open HTML report / Close**
+  buttons. No more black `cmd.exe` flash on launch.
+- **Scan cancellation.** The Cancel button cleanly stops the
+  current scan via a `CancellationToken`; the HTML report still
+  gets rendered with whatever was collected so far.
+- **HTML report — severity filter bar.** The "Raw scanner sections"
+  block now has Hit / Warn / OK / Info / Err toggle buttons (plus
+  an All master toggle); state is persisted in `localStorage`.
+- **`--console` flag** — the legacy stdin/stdout mode is still
+  available unchanged for staff workflows that screen-share the
+  console output.
+- **Internal refactor.** Scanning logic moved into a reusable
+  `ScanOrchestrator` and `ConsoleUI` is now a façade over a
+  swappable `IUiSink`, so both hosts share the same scanner code.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
 
 ## What's new in v0.6.0
 

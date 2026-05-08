@@ -4,6 +4,67 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.7.0] — 2026-05
+
+### Added
+
+- **Windows Forms GUI as default mode.** Double-clicking
+  `McSsCheck.exe` now opens a real window (no more raw `cmd.exe`)
+  with:
+  - title bar + version label,
+  - progress bar that animates while a scan is running and turns
+    into a determinate `step / total` bar once the orchestrator
+    knows how many sections will run,
+  - status label showing the currently-active section,
+  - severity-tinted colored log (HIT red / WARN yellow / OK green /
+    INFO blue / Section yellow / Banner cyan) backed by a
+    `RichTextBox`,
+  - four buttons: **Start scan**, **Cancel**, **Open HTML report**,
+    **Close**, with a state machine that enables/disables them based
+    on the current phase (Idle / Running / Done / Cancelled / Failed).
+- **Cancellation.** The Cancel button cancels the scan via a
+  `CancellationTokenSource` plumbed through the orchestrator. Any
+  in-flight scanner that respects the token (Modrinth, VirusTotal,
+  …) bails out cleanly; the report still gets rendered with whatever
+  was collected so far.
+- **HTML report — severity filter bar.** The "Raw scanner sections
+  (full log)" `<details>` block now has a sticky toolbar with five
+  toggle buttons (**Hit / Warn / OK / Info / Err**) plus an **All**
+  master toggle. Clicking a button hides every `<tr>` of that
+  severity in every section. State is persisted to `localStorage`
+  (key `mcss-sev-filter`) so a refresh keeps the staff member's
+  view. The "Raw scanner sections" block also defaults to expanded
+  now that filtering makes it useful.
+
+### Changed
+
+- **`OutputType`** flipped from `Exe` to `WinExe`. No more black
+  console window flashing on launch.
+- **Scanning logic extracted** from `Program.Main` into a reusable
+  `ScanOrchestrator.RunAsync(ScanOptions, IProgressSink, CancellationToken)`.
+  Both the GUI and the legacy `--console` host call into it — the
+  scanner code is unchanged.
+- **`ConsoleUI` is now a façade** over a swappable `IUiSink`. The
+  default sink (`ConsoleUiSink`) is the old behaviour byte-for-byte;
+  the GUI host installs `GuiUiSink` at startup so the same
+  `ConsoleUI.Hit / .Warn / .Info` calls land in the WinForms log
+  with the right colour.
+- **Argument parsing**: added `--gui` (default; explicit form for
+  scripting) and `--console` (legacy stdout streaming). Behaviour of
+  every existing flag is unchanged.
+- **`EnableWindowsTargeting`** added to the csproj so non-Windows
+  CI / dev VMs can `dotnet build` the project for syntax checks.
+  The actual binary is still produced by the Windows CI runner.
+
+### Compatibility
+
+- `--console` reproduces the v0.6.0 stdin/stdout flow exactly,
+  including the `yes`-typed consent prompt and the "Press Enter to
+  close" tail. SS staff workflows that screen-share the console can
+  keep using `McSsCheck.exe --console`.
+- All previous `--no-*`, `--vt-key`, `--html-path`, `-y`, `--report-only`
+  flags work in both modes.
+
 ## [0.6.0] — 2026-05
 
 ### Added
