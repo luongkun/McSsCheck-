@@ -91,19 +91,24 @@ internal static class HtmlReportRenderer
         RenderModsTable(sb, r);
 
         // ----- detailed sections (raw scanner output) -----
-        sb.AppendLine("<details class='raw-toggle' open>" +
+        // v0.8.0: collapsed by default — raw scanner sections are noisy and
+        // most staff only need the curated cards above. Click the summary to
+        // expand if you want the full log.
+        sb.AppendLine("<details class='raw-toggle'>" +
                       "<summary>Raw scanner sections (full log)</summary>");
 
         // Severity filter bar — JS toggles row visibility & remembers state in
         // localStorage so a refresh keeps the staff member's last view.
+        // v0.8.0: default to HIT+WARN visible (OK / INFO / Err hidden) so the
+        // initial expand isn't a wall of integrity-pass and informational rows.
         sb.AppendLine("<div class='sev-filter' role='toolbar' aria-label='Filter by severity'>");
         sb.AppendLine("  <span class='sev-filter-label'>Show:</span>");
-        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-all  active' data-sev='all'>All</button>");
+        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-all'         data-sev='all'>All</button>");
         sb.AppendLine("  <button type='button' class='sev-btn sev-btn-hit  active' data-sev='hit'>Hit</button>");
         sb.AppendLine("  <button type='button' class='sev-btn sev-btn-warn active' data-sev='warn'>Warn</button>");
-        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-ok   active' data-sev='ok'>OK</button>");
-        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-info active' data-sev='info'>Info</button>");
-        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-err  active' data-sev='error'>Err</button>");
+        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-ok'          data-sev='ok'>OK</button>");
+        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-info'        data-sev='info'>Info</button>");
+        sb.AppendLine("  <button type='button' class='sev-btn sev-btn-err'         data-sev='error'>Err</button>");
         sb.AppendLine("</div>");
 
         sb.AppendLine("<nav class='toc'>");
@@ -173,6 +178,10 @@ internal static class HtmlReportRenderer
     /// Tiny vanilla-JS filter for the raw-section table rows. State is
     /// persisted to <c>localStorage</c> per browser so a refresh keeps the
     /// staff member's view.
+    ///
+    /// v0.8.0: default state is HIT+WARN only (OK / INFO / Err hidden) to keep
+    /// the initial view focused on actionable rows. Existing localStorage
+    /// preferences (key <c>mcss-sev-filter</c>) are still respected.
     /// </summary>
     private static string FilterJs() => @"
 (function(){
@@ -181,13 +190,13 @@ internal static class HtmlReportRenderer
   var btns = document.querySelectorAll('.sev-btn');
   if (!btns.length) return;
 
-  // Read previous state, or default to all severities visible.
+  // Read previous state from localStorage, otherwise default to HIT+WARN only.
   var state = (function(){
     try {
       var raw = localStorage.getItem(KEY);
       if (raw) return JSON.parse(raw);
     } catch(e) {}
-    var s = {}; SEVS.forEach(function(x){ s[x] = true; }); return s;
+    return { hit: true, warn: true, ok: false, info: false, error: false };
   })();
 
   function persist(){
@@ -300,46 +309,74 @@ internal static class HtmlReportRenderer
             return;
         }
 
+        // v0.8.0: deduplicate findings that point at the same cheat client. A
+        // typical Atermys/Koid hit fires from Process+Recent+Registry — that's
+        // 3 separate cards in v0.7.0, all saying the same thing. We now group
+        // by cheat-keyword tag (or Source+Title for non-keyword findings) and
+        // render ONE card per group, with the other sources collapsed into
+        // "Show details".
+        var groups = items
+            .GroupBy(x => DedupeKey(x.Result))
+            .Select(g =>
+            {
+                var ordered = g.OrderByDescending(x => SevRank(x.Result.Severity))
+                               .ThenBy(x => x.Section.Title, StringComparer.Ordinal)
+                               .ThenBy(x => x.Result.Title, StringComparer.Ordinal)
+                               .ToList();
+                var primary = ordered[0];
+                var extras  = ordered.Skip(1).ToList();
+                return (primary.Section, primary.Result, extras);
+            })
+            .OrderByDescending(g => SevRank(g.Result.Severity))
+            .ThenBy(g => g.Result.Title, StringComparer.Ordinal)
+            .ToList();
+
         // Two layouts:
         //  - "headline" cards (Hit / strong-warn) — large, 2-col grid, top of pane
         //  - "row" cards (Ok / Info / Backstage) — single-column compact rows, bottom of pane
-        var headline = items.Where(x => x.Result.Severity == Severity.Hit
-                                     || (x.Result.Severity == Severity.Warn && key == "warnings")).ToList();
-        var rows     = items.Except(headline).ToList();
+        var headline = groups.Where(g => g.Result.Severity == Severity.Hit
+                                       || (g.Result.Severity == Severity.Warn && key == "warnings"))
+                             .ToList();
+        var rows = groups.Except(headline).ToList();
 
         if (headline.Count > 0)
         {
             sb.AppendLine("      <div class='detect-grid'>");
-            foreach (var (sec, res) in headline) AppendDetectCard(sb, sec, res);
+            foreach (var g in headline) AppendDetectCard(sb, g.Section, g.Result, g.extras);
             sb.AppendLine("      </div>");
         }
         if (rows.Count > 0)
         {
             sb.AppendLine("      <div class='detect-rows'>");
-            foreach (var (sec, res) in rows) AppendDetectRow(sb, sec, res);
+            foreach (var g in rows) AppendDetectRow(sb, g.Section, g.Result, g.extras);
             sb.AppendLine("      </div>");
         }
 
         sb.AppendLine("    </div>");
     }
 
-    private static void AppendDetectCard(StringBuilder sb, SessionReport.Section sec, ScanResult res)
+    private static void AppendDetectCard(StringBuilder sb,
+        SessionReport.Section sec, ScanResult res,
+        List<(SessionReport.Section Section, ScanResult Result)> extras)
     {
-        bool active = IsActive(res);
+        bool active = IsActive(res) || extras.Any(x => IsActive(x.Result));
         var statusTag = active ? "Boot instance" : "Out of instance";
         var statusCls = active ? "tag-active" : "tag-inactive";
         var sevCls    = res.Severity == Severity.Hit ? "sev-hit"
                        : res.Severity == Severity.Warn ? "sev-warn"
                        : "sev-info";
 
+        // v0.8.0: card layout intentionally compact — icon + tag + title + path
+        // + Show details. The free-form description block has been dropped
+        // because most staff only need the title to recognise the cheat.
         sb.AppendLine($"        <div class='detect-card {sevCls}'>");
         sb.AppendLine("          <div class='detect-head'>");
         sb.AppendLine($"            <div class='detect-icon detect-icon-{sevCls}'>{IconFor(res.Severity)}</div>");
         sb.AppendLine($"            <div class='detect-tag {statusCls}'>{Esc(statusTag)}</div>");
         sb.AppendLine("          </div>");
         sb.AppendLine($"          <div class='detect-title'>{Esc(res.Title)}</div>");
-        if (!string.IsNullOrEmpty(res.Detail))
-            sb.AppendLine($"          <div class='detect-desc'>{Esc(Truncate(res.Detail, 220))}</div>");
+        if (extras.Count > 0)
+            sb.AppendLine($"          <div class='detect-multi'>+ {extras.Count} more source(s) — see details</div>");
         if (!string.IsNullOrEmpty(res.FilePath))
         {
             sb.AppendLine("          <div class='detect-path-row'>");
@@ -347,13 +384,15 @@ internal static class HtmlReportRenderer
             sb.AppendLine($"            <code class='path'>{Esc(res.FilePath)}</code>");
             sb.AppendLine("          </div>");
         }
-        AppendShowDetails(sb, sec, res);
+        AppendShowDetails(sb, sec, res, extras);
         sb.AppendLine("        </div>");
     }
 
-    private static void AppendDetectRow(StringBuilder sb, SessionReport.Section sec, ScanResult res)
+    private static void AppendDetectRow(StringBuilder sb,
+        SessionReport.Section sec, ScanResult res,
+        List<(SessionReport.Section Section, ScanResult Result)> extras)
     {
-        bool active = IsActive(res);
+        bool active = IsActive(res) || extras.Any(x => IsActive(x.Result));
         var status     = res.Severity == Severity.Ok      ? "PASSED"
                        : res.Severity == Severity.Info    ? (active ? "ACTIVE" : "INACTIVE")
                        : res.Severity == Severity.Warn    ? "WARNING"
@@ -363,30 +402,37 @@ internal static class HtmlReportRenderer
         var statusCls  = active ? "tag-active" : "tag-inactive";
         var sevCls     = "sev-" + res.Severity.ToString().ToLowerInvariant();
 
+        // v0.8.0: row layout no longer carries the StatusBlurb fluff
+        // ("Worth a closer look during the screenshare." etc.) — staff already
+        // know what each severity means, the words are pure decoration.
         sb.AppendLine($"        <div class='detect-row {sevCls}'>");
         sb.AppendLine($"          <div class='row-icon row-icon-{sevCls}'>{IconFor(res.Severity)}</div>");
         sb.AppendLine("          <div class='row-info'>");
         sb.AppendLine($"            <div class='row-status'>{Esc(status)}</div>");
-        sb.AppendLine($"            <div class='row-meta'>{Esc(StatusBlurb(res))}</div>");
         sb.AppendLine($"            <div class='row-title'>{Esc(res.Title)}</div>");
+        if (extras.Count > 0)
+            sb.AppendLine($"            <div class='row-multi'>+ {extras.Count} more source(s) — see details</div>");
         if (!string.IsNullOrEmpty(res.FilePath))
             sb.AppendLine($"            <div class='row-path'><span class='path-icon'>&#128193;</span><code class='path'>{Esc(res.FilePath)}</code></div>");
         sb.AppendLine("          </div>");
         sb.AppendLine("          <div class='row-actions'>");
         sb.AppendLine($"            <span class='detect-tag {statusCls}'>{Esc(statusTag)}</span>");
         sb.AppendLine("          </div>");
-        AppendShowDetails(sb, sec, res);
+        AppendShowDetails(sb, sec, res, extras);
         sb.AppendLine("        </div>");
     }
 
-    private static void AppendShowDetails(StringBuilder sb, SessionReport.Section sec, ScanResult res)
+    private static void AppendShowDetails(StringBuilder sb,
+        SessionReport.Section sec, ScanResult res,
+        List<(SessionReport.Section Section, ScanResult Result)> extras)
     {
         // Only render if there's something extra to show.
         bool hasMore = !string.IsNullOrEmpty(res.Detail)
                     || !string.IsNullOrEmpty(res.Hash)
                     || (res.Tags is { Count: > 0 })
                     || res.Timestamp.HasValue
-                    || !string.IsNullOrEmpty(res.Source);
+                    || !string.IsNullOrEmpty(res.Source)
+                    || extras.Count > 0;
         if (!hasMore) return;
 
         sb.AppendLine("          <details class='show-details'>");
@@ -409,6 +455,23 @@ internal static class HtmlReportRenderer
         }
         if (!string.IsNullOrEmpty(res.Detail))
             sb.AppendLine($"              <pre class='details-detail'>{Esc(res.Detail)}</pre>");
+
+        if (extras.Count > 0)
+        {
+            sb.AppendLine("              <div class='details-extras'>");
+            sb.AppendLine("                <b>Other source(s) reporting this same finding:</b>");
+            sb.AppendLine("                <ul>");
+            foreach (var (xSec, xRes) in extras)
+            {
+                var line = $"<b>{Esc(xRes.Source)}</b> · <span class='dim'>{Esc(xSec.Title)}</span> · {Esc(xRes.Title)}";
+                if (!string.IsNullOrEmpty(xRes.FilePath))
+                    line += $" · <code class='path'>{Esc(xRes.FilePath)}</code>";
+                sb.AppendLine($"                  <li>{line}</li>");
+            }
+            sb.AppendLine("                </ul>");
+            sb.AppendLine("              </div>");
+        }
+
         sb.AppendLine("            </div>");
         sb.AppendLine("          </details>");
     }
@@ -433,17 +496,53 @@ internal static class HtmlReportRenderer
         _              => "&#9679;",
     };
 
-    private static string StatusBlurb(ScanResult r) => r.Severity switch
+    private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
+
+    /// <summary>Severity ranking used for picking the "primary" finding in a dedup group.</summary>
+    private static int SevRank(Severity s) => s switch
     {
-        Severity.Hit   => IsActive(r) ? "Active threat — process currently running with this artifact." : "Found inactive or previously used threat; not running in this instance.",
-        Severity.Warn  => "Worth a closer look during the screenshare.",
-        Severity.Info  => IsActive(r) ? "Active artifact — currently in use." : "Informational entry — included for context.",
-        Severity.Ok    => "Check passed cleanly.",
-        Severity.Error => "Scanner could not complete this check.",
-        _              => "",
+        Severity.Hit   => 5,
+        Severity.Warn  => 4,
+        Severity.Error => 3,
+        Severity.Info  => 2,
+        Severity.Ok    => 1,
+        _              => 0,
     };
 
-    private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
+    /// <summary>
+    /// Tags used by scanners to annotate behaviour rather than identify a
+    /// specific cheat client. We exclude these when computing the dedup key
+    /// so a result tagged <c>["koid", "recent-files"]</c> still groups with
+    /// another tagged <c>["koid", "active"]</c>.
+    /// </summary>
+    private static readonly HashSet<string> MetaTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "active", "backstage", "recent-files",
+        "engine", "selfdestruct", "bypass",
+        "prefetch", "prefetch-missing", "event-log-cleared",
+        "ads", "ads-script", "usn-summary",
+    };
+
+    /// <summary>
+    /// Compute a stable dedup key for a finding. Findings sharing this key
+    /// are merged into a single card whose "Show details" lists the other
+    /// sources. Strategy: prefer the first non-meta <c>Tag</c> (the cheat
+    /// keyword like <c>koid</c> / <c>atermys</c>); fall back to
+    /// <c>Source|Title</c> for findings that have no keyword tags.
+    /// </summary>
+    private static string DedupeKey(ScanResult r)
+    {
+        if (r.Tags is { Count: > 0 })
+        {
+            foreach (var t in r.Tags)
+            {
+                if (string.IsNullOrEmpty(t)) continue;
+                if (MetaTags.Contains(t)) continue;
+                return "kw:" + t.ToLowerInvariant();
+            }
+        }
+        return ("st:" + r.Source + "|" + r.Title).ToLowerInvariant();
+    }
 
     // -----------------------------------------------------------------
 
@@ -703,7 +802,7 @@ header.top h1 { margin: 0 0 8px 0; font-size: 24px; }
 .detect-tag.tag-inactive { color: var(--dim); border-color: var(--bd);              background: rgba(255,255,255,0.04); }
 
 .detect-title { font-size: 16px; font-weight: 700; line-height: 1.3; }
-.detect-desc { background: rgba(255,255,255,0.04); border: 1px solid var(--bd); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #ccc; }
+.detect-multi, .row-multi { color: var(--dim); font-size: 12px; font-style: italic; }
 .detect-path-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .path-icon { font-size: 14px; opacity: 0.7; }
 
@@ -731,6 +830,9 @@ header.top h1 { margin: 0 0 8px 0; font-size: 24px; }
 .details-hash { margin-bottom: 6px; }
 .details-tags { margin-bottom: 6px; }
 .details-detail { font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; background: var(--bg2); padding: 8px 10px; border-radius: 6px; max-height: 240px; overflow: auto; }
+.details-extras { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--bd); }
+.details-extras ul { margin: 6px 0 0 0; padding-left: 18px; }
+.details-extras li { margin: 4px 0; word-break: break-word; }
 
 /* ----- PC info / accounts / mods ----- */
 .pc-list { list-style: none; margin: 0; padding: 0; }
@@ -839,7 +941,7 @@ footer { padding: 16px 32px; color: #666; font-size: 12px; }
   .cat-tab .tab-count { background: rgba(0,0,0,0.06); }
   .detect-card, .detect-row, .acc-row, .mod-row, code.path { background: var(--bg3); border-color: var(--bd); }
   .detect-icon, .row-icon { background: rgba(0,0,0,0.03); }
-  .detect-desc, .details-detail { background: rgba(0,0,0,0.03); }
+  .details-detail { background: rgba(0,0,0,0.03); }
   .detect-tag.tag-active   { color: var(--hit); border-color: rgba(194, 41, 58, 0.45); background: rgba(194, 41, 58, 0.06); }
   .detect-tag.tag-inactive { color: var(--dim); border-color: var(--bd);              background: rgba(0,0,0,0.03); }
   .mod-badge.ver-yes { background: #def6e3; color: #176d2c; }

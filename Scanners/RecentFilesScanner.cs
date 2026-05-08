@@ -124,15 +124,8 @@ internal static class RecentFilesScanner
                 FilePath: lnkPath, Timestamp: mtime,
                 Tags: matched.Concat(new[] { "recent-files" }).ToArray()));
         }
-        else if (jarLike)
-        {
-            ConsoleUI.Info($"  recent {fname}  mtime={mtime:yyyy-MM-dd HH:mm}");
-            section.Add(new ScanResult(
-                Source: SourceName, Severity: Severity.Info,
-                Title: $"Recently opened binary: {displayName}",
-                Detail: $"shortcut={lnkPath}\nopened~={mtime:yyyy-MM-dd HH:mm}",
-                FilePath: lnkPath, Timestamp: mtime,
-                Tags: new[] { "recent-files" }));
-        }
+        // v0.8.0 noise cut: drop the "Severity.Info per .jar/.exe shortcut" pathway.
+        // Listing every WINWORD/ZALO/UNINSO000.EXE shortcut is noise — staff need
+        // only know about shortcuts whose name actually matches a cheat keyword.
     }
 }

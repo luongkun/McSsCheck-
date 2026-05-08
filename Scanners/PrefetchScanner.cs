@@ -43,41 +43,29 @@ internal static class PrefetchScanner
             return;
         }
 
-        int relevant = 0;
+        // v0.8.0 noise cut: drop the "Severity.Info per minecraft/launcher prefetch" pathway
+        // — those entries are typically WINWORD.EXE / ZALO.EXE / launcher.exe, not cheat-related.
+        // Only emit Hits when the prefetch entry name actually matches a cheat keyword.
+        int hits = 0, scanned = 0;
         foreach (var pf in files.OrderByDescending(File.GetLastWriteTime))
         {
+            scanned++;
             var name = Path.GetFileName(pf);
-            var lower = name.ToLowerInvariant();
-            bool relevantExe = lower.StartsWith("java.exe-") || lower.StartsWith("javaw.exe-")
-                               || lower.StartsWith("minecraft") || lower.Contains("launcher");
             var nameHits = KnownCheats.MatchKeywords(name, KnownCheats.NameKeywords).ToList();
-
-            if (!relevantExe && nameHits.Count == 0) continue;
+            if (nameHits.Count == 0) continue;
 
             var fi = new FileInfo(pf);
-            relevant++;
-            if (nameHits.Count > 0)
-            {
-                ConsoleUI.Hit($"  {name}  matches [{string.Join(",", nameHits)}]  last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
-                section.Add(new ScanResult(
-                    Source: SourceName, Severity: Severity.Hit,
-                    Title: $"Prefetch hit: {name}",
-                    Detail: $"matched: {string.Join(", ", nameHits)}, last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}",
-                    FilePath: pf, Timestamp: fi.LastWriteTime,
-                    Tags: nameHits.ToArray()));
-            }
-            else
-            {
-                ConsoleUI.Info($"  {name}  last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
-                section.Add(new ScanResult(
-                    Source: SourceName, Severity: Severity.Info,
-                    Title: $"Prefetch entry: {name}",
-                    Detail: $"last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}",
-                    FilePath: pf, Timestamp: fi.LastWriteTime));
-            }
+            hits++;
+            ConsoleUI.Hit($"  {name}  matches [{string.Join(",", nameHits)}]  last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Hit,
+                Title: $"Prefetch hit: {name}",
+                Detail: $"matched: {string.Join(", ", nameHits)}, last-run~={fi.LastWriteTime:yyyy-MM-dd HH:mm}",
+                FilePath: pf, Timestamp: fi.LastWriteTime,
+                Tags: nameHits.ToArray()));
         }
 
-        if (relevant == 0)
-            ConsoleUI.Ok("No Java/Minecraft-related Prefetch entries.");
+        if (hits == 0)
+            ConsoleUI.Ok($"No cheat-keyword Prefetch entries (scanned {scanned}).");
     }
 }

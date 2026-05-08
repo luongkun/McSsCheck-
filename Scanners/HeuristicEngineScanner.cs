@@ -58,10 +58,12 @@ internal static class HeuristicEngineScanner
     /// </summary>
     private static void GenericSelfDestruct(SessionReport report, SessionReport.Section section)
     {
-        // We rely on UsnJournalScanner having already populated the report; if
-        // the user passed --no-usn or the scanner skipped (no admin), we just
-        // produce a soft INFO note.
-        int deletes = 0;
+        // v0.8.0: read the running tally directly from UsnJournalScanner.
+        // Previously we re-scanned all sections looking for "Deleted binary on" /
+        // "Deleted file matches" titles, but the per-file Warning cards have been
+        // dropped to reduce report noise. We also still scan keyword-matched HIT
+        // entries already added to the report so the sample list stays useful.
+        int deletes = UsnJournalScanner.LastDeletedBinaryCount;
         var samples = new List<string>();
         foreach (var sec in report.Sections)
         {
@@ -69,13 +71,9 @@ internal static class HeuristicEngineScanner
             {
                 if (!string.Equals(r.Source, UsnJournalScanner.SourceName, StringComparison.Ordinal))
                     continue;
-                if (r.Title.StartsWith("Deleted file matches", StringComparison.Ordinal) ||
-                    r.Title.StartsWith("Deleted binary on",    StringComparison.Ordinal))
-                {
-                    deletes++;
-                    if (samples.Count < 5 && !string.IsNullOrEmpty(r.FilePath))
-                        samples.Add(r.FilePath);
-                }
+                if (samples.Count >= 5) break;
+                if (!string.IsNullOrEmpty(r.FilePath))
+                    samples.Add(r.FilePath);
             }
         }
 
@@ -92,12 +90,9 @@ internal static class HeuristicEngineScanner
         }
         else if (deletes > 0)
         {
-            ConsoleUI.Info($"  GenericSelfDestruct: {deletes} deleted (below threshold {Threshold})");
-            section.Add(new ScanResult(
-                Source: SourceName, Severity: Severity.Info,
-                Title: "Recent deletions present (below SelfDestruct threshold)",
-                Detail: $"USN journal reports {deletes} recently-deleted artifacts (threshold {Threshold}).",
-                Tags: new[] { "engine", "selfdestruct" }));
+            // Below threshold: keep this as console-only INFO (no card) — the report
+            // already shows individual cheat-keyword Hits if they exist.
+            ConsoleUI.Info($"  GenericSelfDestruct: {deletes} deleted (below threshold {Threshold}) — not flagged.");
         }
         else
         {
