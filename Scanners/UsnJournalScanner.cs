@@ -26,6 +26,16 @@ internal static class UsnJournalScanner
 {
     public const string SourceName = "UsnJournalScanner";
 
+    /// <summary>
+    /// Number of recent .jar/.exe/.bat/.class deletions observed during the most
+    /// recent <see cref="Run"/>. Reset to zero at the start of every run.
+    /// Used by <c>HeuristicEngineScanner.GenericSelfDestruct</c> to decide
+    /// whether to flag mass-deletion behaviour, without us having to emit a
+    /// noisy per-file Warning card for every legitimate deletion (UNINS000.EXE,
+    /// WINWORD.EXE, ZALO.EXE, …).
+    /// </summary>
+    public static int LastDeletedBinaryCount { get; private set; }
+
     private const uint GENERIC_READ                 = 0x80000000;
     private const uint FILE_SHARE_READ              = 0x00000001;
     private const uint FILE_SHARE_WRITE             = 0x00000002;
@@ -89,6 +99,7 @@ internal static class UsnJournalScanner
     public static void Run(SessionReport.Section section)
     {
         ConsoleUI.Section("NTFS USN Journal (recently deleted .jar/.exe/.bat)");
+        LastDeletedBinaryCount = 0;
 
         if (!IsElevated())
         {
@@ -240,6 +251,7 @@ internal static class UsnJournalScanner
                                 if (relevant)
                                 {
                                     found++;
+                                    LastDeletedBinaryCount++;
                                     DateTime ts;
                                     try { ts = DateTime.FromFileTime(tsTicks); }
                                     catch { ts = DateTime.MinValue; }
@@ -255,15 +267,11 @@ internal static class UsnJournalScanner
                                             FilePath: fname, Timestamp: ts,
                                             Tags: matched.ToArray()));
                                     }
-                                    else
-                                    {
-                                        ConsoleUI.Info($"  deleted on {drive}: {fname}  ts={ts:yyyy-MM-dd HH:mm}");
-                                        section.Add(new ScanResult(
-                                            Source: SourceName, Severity: Severity.Warn,
-                                            Title: $"Deleted binary on {drive}",
-                                            Detail: $"file={fname}, deleted~={ts:yyyy-MM-dd HH:mm}",
-                                            FilePath: fname, Timestamp: ts));
-                                    }
+                                    // v0.8.0 noise cut: drop the "Severity.Warn per deleted binary"
+                                    // pathway. Most deletions are legitimate uninstalls (UNINS000.EXE)
+                                    // or app updates (WINWORD.EXE, ZALO.EXE). We still increment
+                                    // LastDeletedBinaryCount above so HeuristicEngineScanner can flag
+                                    // mass-deletion behaviour with a single summary card.
                                 }
                             }
 

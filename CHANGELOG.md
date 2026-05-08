@@ -4,6 +4,71 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.8.0] — 2026-05
+
+The "less is more" release. The v0.7.0 report fired a card for every
+prefetch / recent / USN entry it touched, which meant a healthy
+machine still produced ~15 noisy cards (`WINWORD.EXE`, `ZALO.EXE`,
+`UNINS000.EXE`, …). Same cheat hit from 3 scanners would also render
+3 separate cards saying the same thing. v0.8.0 cuts that down without
+losing any actual signal.
+
+### Changed
+
+- **Prefetch scanner** no longer emits an `Severity.Info` card for
+  every `minecraft*` / `launcher*` / `java(w).exe-*` prefetch entry.
+  Only entries whose name actually matches a cheat keyword now reach
+  the report — everything else stays out.
+- **Recent-files scanner** dropped the "Recently opened binary" Info
+  pathway. We were flagging every `.lnk` shortcut to a `.jar` / `.exe`
+  / `.bat` / `.cmd` / `.class` file as noise; now only shortcuts whose
+  name matches a cheat keyword surface as Hits.
+- **USN journal scanner** dropped the "Deleted binary on `<drive>`"
+  per-file Warning pathway. Most deleted `.exe` files in NTFS journals
+  are legitimate uninstalls (`UNINS000.EXE`) or app updates
+  (`WINWORD.EXE`, `ZALO.EXE`); the noise was overwhelming. The
+  `HeuristicEngineScanner.GenericSelfDestruct` heuristic still kicks
+  in if the deletion count crosses its threshold (now read from
+  `UsnJournalScanner.LastDeletedBinaryCount`), so mass-deletion
+  behaviour is still flagged with one summary card.
+- **Recycle Bin scanner** dropped the "Recycle Bin entry" per-file
+  Info pathway for the same reason. Only matches against the cheat
+  keyword list reach the report now.
+- **HTML report — detect-card layout** is now compact: icon + status
+  tag + title + path + Show details. The free-form "detect-desc"
+  description block has been removed (most descriptions repeated the
+  title), and the "row-meta" status blurb on compact rows
+  ("Worth a closer look during the screenshare." etc.) has been
+  removed. Staff already know what each severity means; the words
+  were pure decoration.
+- **HTML report — finding deduplication.** Findings that point at the
+  same cheat client are now grouped into a single card, with the
+  other sources collapsed into "Show details → Other source(s)".
+  Grouping key is the first non-meta tag (the cheat keyword like
+  `koid` / `atermys`); for findings without a keyword tag we fall
+  back to `Source|Title`. A typical Atermys/Koid hit fired by
+  Process+Recent+Registry now renders one card instead of three.
+- **HTML report — severity filter** defaults to **HIT + WARN** only
+  on a fresh install (existing `localStorage` preferences under
+  `mcss-sev-filter` are still respected). The "Raw scanner sections
+  (full log)" `<details>` block is also collapsed by default — open
+  it only if you want the full per-section log.
+
+### Internal
+
+- `UsnJournalScanner` exposes `LastDeletedBinaryCount` so
+  `HeuristicEngineScanner.GenericSelfDestruct` can tally deletions
+  without scraping report sections.
+- `HtmlReportRenderer` gained `SevRank()` / `DedupeKey()` helpers and
+  a `MetaTags` set used to skip behaviour-tags (`active`, `recent-files`,
+  `selfdestruct`, …) when computing the dedup key.
+- The unused `StatusBlurb()` helper has been removed.
+
+### Compatibility
+
+- No flag changes. CLI surface is identical to v0.7.0; existing
+  `--console` / `--no-vt` / `--html-path` / etc. flows work unchanged.
+
 ## [0.7.0] — 2026-05
 
 ### Added

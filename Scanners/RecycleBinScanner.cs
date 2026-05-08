@@ -57,14 +57,13 @@ internal static class RecycleBinScanner
                             FilePath: file, Timestamp: fi.LastWriteTime,
                             Tags: nameHits.ToArray()));
                     }
+                    // v0.8.0 noise cut: drop the "Severity.Info per recycle-bin .jar/.exe" pathway —
+                    // emitting a card for every uninstalled or update-replaced binary in the Recycle
+                    // Bin is high-noise / low-signal. Only surface entries whose name actually
+                    // matches a cheat keyword.
                     else
                     {
                         ConsoleUI.Dim($"  {file}  size={fi.Length}  deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
-                        section.Add(new ScanResult(
-                            Source: SourceName, Severity: Severity.Info,
-                            Title: $"Recycle Bin entry: {Path.GetFileName(file)}",
-                            Detail: $"size={fi.Length}, deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}",
-                            FilePath: file, Timestamp: fi.LastWriteTime));
                     }
                 }
             }
