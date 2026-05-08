@@ -12,7 +12,7 @@ namespace McSsCheck;
 [SupportedOSPlatform("windows")]
 internal static class Program
 {
-    private const string Version = "0.3.0";
+    private const string Version = "0.4.0";
 
     private static async Task<int> Main(string[] args)
     {

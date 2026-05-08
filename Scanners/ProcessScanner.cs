@@ -49,7 +49,7 @@ internal static class ProcessScanner
                     Title: sus ? "Suspicious -javaagent path" : "-javaagent declared",
                     Detail: $"PID {p.Pid}: -javaagent:{agent}",
                     FilePath: agent,
-                    Tags: new[] { "javaagent" }));
+                    Tags: new[] { "javaagent", "active" }));
             }
 
             foreach (var token in TokenizeCmdline(p.CommandLine))
@@ -63,7 +63,7 @@ internal static class ProcessScanner
                     Title: "Cmdline jar matches cheat keyword",
                     Detail: $"PID {p.Pid} cmdline jar '{token}' matched: {string.Join(", ", hits)}",
                     FilePath: token,
-                    Tags: hits.ToArray()));
+                    Tags: hits.Concat(new[] { "active" }).ToArray()));
             }
 
             try
@@ -79,7 +79,7 @@ internal static class ProcessScanner
                         Title: "DLL loaded from unusual path",
                         Detail: $"PID {p.Pid} loaded {path}",
                         FilePath: path,
-                        Tags: new[] { "module-injection" }));
+                        Tags: new[] { "module-injection", "active" }));
                 }
             }
             catch (Exception ex)
