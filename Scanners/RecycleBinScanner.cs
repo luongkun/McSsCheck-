@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
 using McSsCheck.Data;
+using McSsCheck.Models;
 using McSsCheck.Util;
 
 namespace McSsCheck.Scanners;
@@ -10,12 +11,12 @@ namespace McSsCheck.Scanners;
 [SupportedOSPlatform("windows")]
 internal static class RecycleBinScanner
 {
-    public static void Run()
+    public const string SourceName = "RecycleBinScanner";
+
+    public static void Run(SessionReport.Section section)
     {
         ConsoleUI.Section("Recycle Bin (jar / Minecraft files)");
 
-        // Per-volume recycle bin lives under <drive>:\$Recycle.Bin\<SID>\
-        // Filenames are mangled ($I... = metadata, $R... = real content) but extensions are preserved.
         var driveRoots = DriveInfo.GetDrives()
             .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
             .Select(d => Path.Combine(d.RootDirectory.FullName, "$Recycle.Bin"))
@@ -47,9 +48,24 @@ internal static class RecycleBinScanner
                     var fi = new FileInfo(file);
                     var nameHits = KnownCheats.MatchKeywords(file, KnownCheats.NameKeywords).ToList();
                     if (nameHits.Count > 0)
+                    {
                         ConsoleUI.Hit($"  recycle bin entry matches [{string.Join(",", nameHits)}]: {file}  size={fi.Length}  deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
+                        section.Add(new ScanResult(
+                            Source: SourceName, Severity: Severity.Hit,
+                            Title: "Cheat-keyword binary in Recycle Bin",
+                            Detail: $"size={fi.Length}, deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}, matched: {string.Join(", ", nameHits)}",
+                            FilePath: file, Timestamp: fi.LastWriteTime,
+                            Tags: nameHits.ToArray()));
+                    }
                     else
+                    {
                         ConsoleUI.Dim($"  {file}  size={fi.Length}  deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}");
+                        section.Add(new ScanResult(
+                            Source: SourceName, Severity: Severity.Info,
+                            Title: $"Recycle Bin entry: {Path.GetFileName(file)}",
+                            Detail: $"size={fi.Length}, deleted~={fi.LastWriteTime:yyyy-MM-dd HH:mm}",
+                            FilePath: file, Timestamp: fi.LastWriteTime));
+                    }
                 }
             }
             catch (UnauthorizedAccessException)
