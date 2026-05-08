@@ -192,7 +192,6 @@ internal static class UsnJournalScanner
                 {
                     int found = 0;
                     int iterations = 0;
-                    long pages = 0;
 
                     while (iterations < 200)  // hard cap to avoid runaway loops on huge drives
                     {
@@ -276,7 +275,6 @@ internal static class UsnJournalScanner
                         read.StartUsn = nextUsn;
                         Marshal.StructureToPtr(read, rdIn, false);
                         iterations++;
-                        pages++;
                         if (nextUsn >= meta.NextUsn) break;
                     }
 

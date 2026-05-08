@@ -120,7 +120,7 @@ internal static class ModrinthChecker
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("McSsCheck/0.3.0 (+local screenshare helper)");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd($"McSsCheck/{Program.Version} (+local screenshare helper)");
 
         var body = JsonSerializer.Serialize(new
         {

@@ -41,6 +41,27 @@ internal static class KnownCheats
         "yesclient", "redaktor-client", "lithium-cheat", "nextgen",
         "next-gen", "mer-client", "merclient",
 
+        // Newer / less-known clients & utility loaders (added v0.6.0)
+        "auto32k", "auto-32k", "thirty2k", "fdpclient", "fdp-client",
+        "atomic-loader", "spirit-client", "spiritclient",
+        "nighthawk", "nightclient", "sky-client", "skyclient",
+        "polywrap", "hexware-loader", "hexwareloader",
+        "crystalware", "crystal-client", "crystalclient",
+        "ghosthack", "ghost-hack", "blackbox-client", "blackboxclient",
+        "zoot", "zoot-client", "zootclient",
+        "syrup-client", "syrupclient", "uno-client",
+        "ravenb4", "tomate-client", "tomateclient", "ronin-client",
+        "ronin-loader", "kosen-client", "kosenclient",
+        "trex-client", "trexclient", "verge-client", "vergeclient",
+        "rapid-client", "rapidclient", "lunar-cheat", "lunarcheat",
+        "feather-cheat", "feathercheat", "badlion-cheat", "badlioncheat",
+        "essential-cheat", "schizoid", "schizoid-client",
+        "rosehip", "rosehip-client",
+
+        // Ghost-only / pixelmon-like cheat utilities people often forget
+        "x-ray-mod", "xray-mod", "xraymod",
+        "world-downloader", "worlddownloader", "ore-finder",
+
         // Generic suspicious markers
         "client.jar", "cheat", "ghostclient", "x-ray", "xray",
         "freecam", "killaura", "scaffold", "criticals", "reach-mod",
@@ -80,6 +101,39 @@ internal static class KnownCheats
         "salhack.net",
         "lambdaclient.io",
         "bleachhack.org",
+
+        // Newer / less-known cheat shops & client websites (added v0.6.0)
+        "alpine-client.com",
+        "alpineclient.com",
+        "expensive-client.org",
+        "expensiveclient.org",
+        "future.nl",
+        "moho-client.com",
+        "drowned.gg",
+        "matrix.vg",
+        "matrix-client.net",
+        "hexware.io",
+        "hexware.cc",
+        "sigmajek.cc",
+        "ghost-client.cc",
+        "killaura.gg",
+        "atomicclient.cc",
+        "atomic-client.cc",
+        "fdpclient.com",
+        "nightclient.cc",
+        "skyclient.cc",
+        "rapidclient.org",
+        "tomateclient.com",
+        "rosehipclient.com",
+        "schizoidclient.com",
+
+        // GitHub mirrors that consistently host/build cheat clients (substring match)
+        "/wurst-client",
+        "/wurst-imperium",
+        "/meteordevelopment",
+        "/liquidbounce",
+        "/rusherhack",
+        "/bleach-hack",
     };
 
     /// <summary>
@@ -97,6 +151,15 @@ internal static class KnownCheats
         "chestesp", "itemesp", "wallhack", "trichat",
         "module/movement/", "module/combat/", "module/render/",
         "modules/killaura", "modules/scaffold", "modules/reach",
+
+        // Newer markers (added v0.6.0)
+        "sneakaura", "anti-aim", "antiaim", "auto-fish", "autofish",
+        "ghosthand", "ghost-hand", "block-esp", "blockesp",
+        "tnt-aura", "tntaura", "auto-place", "autoplace",
+        "auto-disconnect", "autodisconnect",
+        "modules/exploit/", "modules/world/", "modules/player/",
+        "obfuscated/aaaa", "obfuscated/bbbb",
+        "cheat/module", "cheat/modules", "client/module",
     };
 
     /// <summary>
@@ -120,6 +183,37 @@ internal static class KnownCheats
         "celestial",   "celestialloader",
         "polar",       "polarloader",
         "killauraloader", "scaffoldloader",
+
+        // Added v0.6.0 — external loaders / standalone clients
+        "atomicloader",  "atomic-loader",
+        "spiritloader",  "spirit-loader",
+        "fdploader",     "fdp-loader",
+        "nighthawkloader",
+        "skyloader",     "sky-loader",
+        "polywrap",
+        "rapidloader",   "rapid-loader",
+        "tomateloader",  "tomate-loader",
+        "schizoidloader",
+        "ghostloader",   "ghost-loader",
+    };
+
+    /// <summary>
+    /// Heuristic: process names that should NEVER match — common system /
+    /// development tools whose names happen to be substrings of cheat names
+    /// (e.g. "future.exe" could be the legitimate Future game launcher).
+    /// Used to short-circuit obvious false positives in <see cref="ExternalCheatProcessNames"/>.
+    /// </summary>
+    public static readonly string[] WellKnownBenignProcesses =
+    {
+        "discord", "discordcanary", "discordptb", "discorddevelopment",
+        "spotify", "steam", "steamservice", "steamwebhelper",
+        "javaw", "java", "javaws",
+        "explorer", "rundll32", "svchost", "system",
+        "chrome", "firefox", "msedge", "opera", "brave",
+        "msteams", "teams", "slack", "code", "devenv",
+        "obs64", "obs32", "obs", "streamlabs",
+        "minecraftlauncher", "minecraft launcher",
+        "tlauncher",
     };
 
     public static IEnumerable<string> MatchKeywords(string haystack, IEnumerable<string> keywords)
@@ -129,6 +223,46 @@ internal static class KnownCheats
         {
             if (haystack.Contains(kw, StringComparison.OrdinalIgnoreCase))
                 yield return kw;
+        }
+    }
+
+    /// <summary>
+    /// Stricter version of <see cref="MatchKeywords"/> for matching short process
+    /// names against <see cref="ExternalCheatProcessNames"/>. Requires the keyword
+    /// to be either an exact match or appear as a token surrounded by non-letter
+    /// characters. Avoids "future.exe" (game launcher) hitting on "future" cheat
+    /// keyword too eagerly.
+    /// </summary>
+    public static IEnumerable<string> MatchProcessName(string processName, IEnumerable<string> keywords)
+    {
+        if (string.IsNullOrEmpty(processName)) yield break;
+
+        var lower = processName.ToLowerInvariant();
+        foreach (var benign in WellKnownBenignProcesses)
+        {
+            if (string.Equals(lower, benign, StringComparison.OrdinalIgnoreCase))
+                yield break;
+        }
+
+        foreach (var kw in keywords)
+        {
+            if (string.Equals(lower, kw, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return kw;
+                continue;
+            }
+            // Token-boundary match: kw appears with non-letter chars on each side
+            // (or string boundary). This filters benign substrings like "ares"
+            // matching "share" or "future" matching "futureproof".
+            int idx = lower.IndexOf(kw, StringComparison.OrdinalIgnoreCase);
+            while (idx >= 0)
+            {
+                bool leftOk  = idx == 0 || !char.IsLetterOrDigit(lower[idx - 1]);
+                int  end     = idx + kw.Length;
+                bool rightOk = end == lower.Length || !char.IsLetterOrDigit(lower[end]);
+                if (leftOk && rightOk) { yield return kw; break; }
+                idx = lower.IndexOf(kw, idx + 1, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }

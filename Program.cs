@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +13,34 @@ namespace McSsCheck;
 [SupportedOSPlatform("windows")]
 internal static class Program
 {
-    private const string Version = "0.5.0";
+    /// <summary>
+    /// Tool version. Read once from the assembly so we don't have to keep three
+    /// copies of the version string in sync (csproj / Program / SessionReport).
+    /// </summary>
+    public static readonly string Version = ResolveVersion();
+
+    private static string ResolveVersion()
+    {
+        try
+        {
+            var asm = typeof(Program).Assembly;
+            // Prefer InformationalVersion (set by csproj <InformationalVersion>) — that
+            // is the human-readable "0.6.0" rather than the 0.6.0.0 file version.
+            var info = asm
+                .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault();
+            if (info != null && !string.IsNullOrWhiteSpace(info.InformationalVersion))
+            {
+                // Strip any "+sha" build metadata suffix Source Link adds.
+                var v = info.InformationalVersion;
+                int plus = v.IndexOf('+');
+                return plus > 0 ? v[..plus] : v;
+            }
+            return asm.GetName().Version?.ToString(3) ?? "0.0.0";
+        }
+        catch { return "0.0.0"; }
+    }
 
     private static async Task<int> Main(string[] args)
     {
@@ -36,6 +64,9 @@ internal static class Program
         bool noModrinth     = false;
         bool noLiveJvm      = false;
         bool noEngines      = false;
+        bool noStartup      = false;
+        bool noTasks        = false;
+        bool noRecent       = false;
         bool reportOnly     = false;
         string? vtKey       = Environment.GetEnvironmentVariable("VT_API_KEY");
         string? htmlPathArg = null;
@@ -60,6 +91,9 @@ internal static class Program
                 case "--no-modrinth": noModrinth   = true; break;
                 case "--no-livejvm":  noLiveJvm    = true; break;
                 case "--no-engines":  noEngines    = true; break;
+                case "--no-startup":  noStartup    = true; break;
+                case "--no-tasks":    noTasks      = true; break;
+                case "--no-recent":   noRecent     = true; break;
                 case "--report-only": reportOnly   = true; break;
                 case "--vt-key":
                     if (i + 1 < args.Length) vtKey = args[++i];
@@ -87,9 +121,10 @@ internal static class Program
             "report under your %TEMP% folder. No persistence.\n" +
             "Read-only checks: PC info, Java/Minecraft processes, LIVE JVM classpath (jars Minecraft is\n" +
             "loading right now), .minecraft, $Recycle.Bin, Prefetch, registry MUICache+Run keys, browser\n" +
-            "history (cheat domains only), NTFS USN journal (admin), Defender event log + DetectionHistory\n" +
-            "(admin), packed-jar heuristic, ADS / SelfDestruct / event-log-cleared engines,\n" +
-            "alt MC accounts on disk, Discord install presence (NOT chat / token data).\n" +
+            "history (cheat domains only), Startup folder, Scheduled tasks, Windows Recent shortcuts,\n" +
+            "NTFS USN journal (admin), Defender event log + DetectionHistory (admin), packed-jar\n" +
+            "heuristic, ADS / SelfDestruct / event-log-cleared engines, external cheat-loader process\n" +
+            "names, alt MC accounts on disk, Discord install presence (NOT chat / token data).\n" +
             "Source: open. License: MIT.");
 
         if (!autoYes)
@@ -122,6 +157,12 @@ internal static class Program
             await RunSection(report, "Registry artifacts",                s => RegistryScanner.Run(s));
         if (!noBrowser)
             await RunSection(report, "Browser history",                   s => BrowserHistoryScanner.Run(s));
+        if (!noStartup)
+            await RunSection(report, "Startup folder shortcuts",          s => StartupFolderScanner.Run(s));
+        if (!noTasks)
+            await RunSection(report, "Scheduled tasks",                   s => ScheduledTaskScanner.Run(s));
+        if (!noRecent)
+            await RunSection(report, "Recently-opened files",             s => RecentFilesScanner.Run(s));
         if (!noUsn)
             await RunSection(report, "NTFS USN journal (deleted files)",  s => UsnJournalScanner.Run(s));
         if (!noDefender)
@@ -197,6 +238,9 @@ internal static class Program
         Console.WriteLine("  --no-modrinth      skip Modrinth jar verification (offline-only mode)");
         Console.WriteLine("  --no-livejvm       skip live JVM classpath inspection");
         Console.WriteLine("  --no-engines       skip heuristic engines (SelfDestruct / Bypass / ADS)");
+        Console.WriteLine("  --no-startup       skip Startup folder scan");
+        Console.WriteLine("  --no-tasks         skip Scheduled Task scan");
+        Console.WriteLine("  --no-recent        skip Recent files scan");
         Console.WriteLine("  --no-browser       skip browser-history scan");
         Console.WriteLine("  --no-recycle       skip Recycle Bin scan");
         Console.WriteLine("  --no-registry      skip registry scan");
