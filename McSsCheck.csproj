@@ -1,8 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- WinExe = no console window pops up when double-clicked. The GUI host
+         is the default. Pass the console flag to attach a fresh console at runtime. -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Allow non-Windows machines (Linux CI / Devin VM) to do `dotnet build`
+         for syntax checks. The actual binary is still produced by the Windows
+         CI runner. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>McSsCheck</RootNamespace>
     <AssemblyName>McSsCheck</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -19,12 +26,12 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishReadyToRun>false</PublishReadyToRun>
 
-    <Version>0.6.0</Version>
-    <AssemblyVersion>0.6.0.0</AssemblyVersion>
-    <FileVersion>0.6.0.0</FileVersion>
-    <InformationalVersion>0.6.0</InformationalVersion>
+    <Version>0.7.0</Version>
+    <AssemblyVersion>0.7.0.0</AssemblyVersion>
+    <FileVersion>0.7.0.0</FileVersion>
+    <InformationalVersion>0.7.0</InformationalVersion>
     <Product>McSsCheck</Product>
-    <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only (with optional Modrinth / VirusTotal hash verification).</Description>
+    <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only (with optional Modrinth / VirusTotal hash verification). Ships a Windows Forms GUI by default; --console for the legacy console mode.</Description>
   </PropertyGroup>
 
   <ItemGroup>
