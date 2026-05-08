@@ -43,6 +43,27 @@ console and as a self-contained HTML file in the user's `%TEMP%` folder.
   matches each URL against a hardcoded list of cheat-client domains
   (e.g. `wurstclient.net`, `meteorclient.com`, …). Does not read any other
   browser data.
+- **Startup folder** (new in v0.6.0) — scans the per-user
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` and the
+  all-users equivalent for `.lnk` / `.bat` / `.jar` / `.vbs` / `.ps1`
+  entries that auto-run at login. `.lnk` shortcuts are resolved through
+  `WScript.Shell` so the underlying executable is matched, not just the
+  shortcut filename.
+- **Scheduled tasks** (new in v0.6.0) — walks `%SystemRoot%\System32\Tasks`
+  and reads each on-disk task XML. Flags tasks whose name, command,
+  arguments or working directory match cheat keywords, plus tasks that
+  run a `.jar` or run anything from a temp/downloads folder. Read-only;
+  nothing is created, modified, or scheduled.
+- **Windows Recent shortcuts** (new in v0.6.0) — scans
+  `%APPDATA%\Microsoft\Windows\Recent\*.lnk` for recently-opened files.
+  Newest entries first; matches against cheat keywords and additionally
+  surfaces every `.jar` / `.exe` / `.bat` / `.class` shortcut as `INFO`
+  for staff to review. Useful when the player deleted the cheat jar but
+  forgot to clear Recent.
+- **External cheat-loader processes** (new in v0.6.0) — enumerates all
+  running processes and matches their names against the standalone
+  cheat-loader list (Vape v4, Doomsday, Sigma external, etc.) using
+  token-boundary matching to avoid false positives.
 - **NTFS USN journal (admin only)** — lists recently *deleted* `.jar` /
   `.exe` / `.bat` / `.class` filenames the player wiped before the SS.
 - **Windows Defender history** — events `1006`, `1007`, `1015`, `1116`, `1117`
@@ -119,6 +140,9 @@ McSsCheck.exe --no-pcinfo           # skip PC information panel
 McSsCheck.exe --no-accounts         # skip alternative Minecraft account scan
 McSsCheck.exe --no-modrinth         # skip Modrinth jar verification (offline mode)
 McSsCheck.exe --no-browser          # skip browser history scan
+McSsCheck.exe --no-startup          # skip Startup folder scan
+McSsCheck.exe --no-tasks            # skip Scheduled Task scan
+McSsCheck.exe --no-recent           # skip Recent files scan
 McSsCheck.exe --no-recycle          # skip Recycle Bin scan
 McSsCheck.exe --no-registry         # skip registry scan
 McSsCheck.exe --no-prefetch         # skip Prefetch scan
@@ -150,6 +174,32 @@ McSsCheck.exe --help                # show all flags
    the hash is sent — never the file**. Free-tier keys are limited to
    ~4 req/min and 500/day, so the tool throttles itself and caps at 24
    lookups per session.
+
+## What's new in v0.6.0
+
+- **Three new persistence-aware scanners**: `StartupFolderScanner`,
+  `ScheduledTaskScanner`, `RecentFilesScanner`. They cover the three
+  most common spots where a cheat loader leaves traces even after the
+  jar itself is deleted.
+- **External cheat-loader process detection** in `ProcessScanner` —
+  matches every running process against ~30 standalone cheat-loader
+  names (Vape v4, Doomsday, Sigma external, atomic-loader, …) using
+  **token-boundary matching** so words like "share" no longer match
+  "ares".
+- **Massively expanded cheat database** — ~40 new client name keywords,
+  ~25 new cheat domains, ~15 new internal-jar keywords, ~15 new
+  external loader process names, plus a benign-process allowlist
+  (Discord, Spotify, Steam, Chrome, Firefox, …) to suppress false
+  positives.
+- **Centralised version string** — version is now read from the
+  assembly's `InformationalVersion` so the value in `McSsCheck.csproj`,
+  the HTTP `User-Agent` of the Modrinth and VirusTotal clients, and the
+  HTML report header can never drift apart again.
+- **HTML report**: now shows scan duration in the header.
+- **Build fix**: removed an unused local in `UsnJournalScanner` that
+  blocked `dotnet build --warnaserror`.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
 
 ## What's new in v0.3.0
 

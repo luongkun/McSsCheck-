@@ -13,7 +13,12 @@ public sealed class SessionReport
     public string Hostname { get; init; } = Environment.MachineName;
     public string Username { get; init; } = Environment.UserName;
     public string OsVersion { get; init; } = Environment.OSVersion.ToString();
-    public string ToolVersion { get; init; } = "0.5.0";
+    /// <summary>
+    /// Filled by <see cref="Program"/> at startup from the assembly's
+    /// InformationalVersion. Kept as a writable property so renderers can
+    /// display whatever the running binary actually is, no string duplication.
+    /// </summary>
+    public string ToolVersion { get; set; } = "0.0.0";
     public DateTime StartedAt { get; init; } = DateTime.Now;
     public DateTime? FinishedAt { get; set; }
 

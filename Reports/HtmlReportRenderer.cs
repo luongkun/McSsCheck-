@@ -67,6 +67,11 @@ internal static class HtmlReportRenderer
         sb.AppendLine($"    <span><b>User:</b> {Esc(r.Username)}</span>");
         sb.AppendLine($"    <span><b>Started:</b> {r.StartedAt:yyyy-MM-dd HH:mm:ss}</span>");
         sb.AppendLine($"    <span><b>Finished:</b> {r.FinishedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "-"}</span>");
+        if (r.FinishedAt.HasValue)
+        {
+            var dur = r.FinishedAt.Value - r.StartedAt;
+            sb.AppendLine($"    <span><b>Duration:</b> {Esc(FormatDuration(dur))}</span>");
+        }
         sb.AppendLine($"    <span><b>Tool:</b> v{Esc(r.ToolVersion)}</span>");
         sb.AppendLine("  </div>");
         sb.AppendLine($"  <div class='verdict {verdictClass}'>{Esc(verdictText)}</div>");
@@ -535,6 +540,14 @@ internal static class HtmlReportRenderer
         int u = 0;
         while (v >= 1024 && u < units.Length - 1) { v /= 1024; u++; }
         return $"{v:0.##} {units[u]}";
+    }
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalSeconds < 1)         return $"{ts.TotalMilliseconds:0} ms";
+        if (ts.TotalMinutes < 1)         return $"{ts.TotalSeconds:0.##} s";
+        if (ts.TotalHours < 1)           return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        return $"{(int)ts.TotalHours}h {ts.Minutes}m";
     }
 
     private static string Css() => @"

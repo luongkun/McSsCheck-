@@ -20,6 +20,9 @@ internal static class ProcessScanner
     {
         ConsoleUI.Section("Running Java / Minecraft processes");
 
+        // --- External cheat loaders (Vape, Doomsday, Sigma external, etc.) ---
+        ScanExternalLoaders(section);
+
         var entries = QueryJavaProcesses(section).ToList();
         if (entries.Count == 0)
         {
@@ -86,6 +89,45 @@ internal static class ProcessScanner
             {
                 ConsoleUI.Dim($"  (cannot enumerate modules: {ex.Message})");
             }
+        }
+    }
+
+    /// <summary>
+    /// Enumerate all running processes and match their names against
+    /// <see cref="KnownCheats.ExternalCheatProcessNames"/>. These are
+    /// standalone .exe cheat loaders (Vape v4, Doomsday, Sigma external,
+    /// etc.) that inject into javaw rather than being a jar.
+    /// </summary>
+    private static void ScanExternalLoaders(SessionReport.Section section)
+    {
+        try
+        {
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    var name = proc.ProcessName;
+                    var matched = KnownCheats.MatchProcessName(name, KnownCheats.ExternalCheatProcessNames).ToList();
+                    if (matched.Count == 0) continue;
+
+                    string? exePath = null;
+                    try { exePath = proc.MainModule?.FileName; } catch { /* access denied */ }
+
+                    ConsoleUI.Hit($"  external cheat loader? PID {proc.Id} name={name} exe={exePath ?? "?"}  matched=[{string.Join(",", matched)}]");
+                    section.Add(new ScanResult(
+                        Source: SourceName, Severity: Severity.Hit,
+                        Title: $"External cheat loader detected: {name}.exe",
+                        Detail: $"PID {proc.Id}, exe={exePath ?? "?"}, matched: {string.Join(", ", matched)}",
+                        FilePath: exePath,
+                        Tags: matched.Concat(new[] { "external-loader", "active" }).ToArray()));
+                }
+                catch { /* ignore individual process errors */ }
+                finally { proc.Dispose(); }
+            }
+        }
+        catch (Exception ex)
+        {
+            ConsoleUI.Dim($"  (external loader scan failed: {ex.Message})");
         }
     }
 

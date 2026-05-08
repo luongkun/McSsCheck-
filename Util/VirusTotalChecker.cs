@@ -60,7 +60,7 @@ internal static class VirusTotalChecker
 
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("McSsCheck/0.2.0 (+local)");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd($"McSsCheck/{Program.Version} (+local)");
         http.DefaultRequestHeaders.Add("x-apikey", apiKey);
 
         var first = true;
