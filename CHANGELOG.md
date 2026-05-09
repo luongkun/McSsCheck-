@@ -4,6 +4,77 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.0] — 2026-05
+
+Headline-readable verdict + JSON export + Discord account
+attribution. Staff opening the HTML report wanted three things that
+v0.8.x didn't give them: an immediate "is this player cheating?"
+answer at the top of the page, a way to keep / share the report as
+structured data, and the actual Discord account a player is signed
+in to so cross-server reports can correlate.
+
+### Added
+
+- **Verdict banner** at the very top of the HTML report. One large
+  line, colour-coded by the worst severity actually present:
+  - `Detects > 0` → red **"This user is cheating (N detect[s])"**
+  - `Warnings > 0` → yellow **"This user is suspicious (N warning[s])"**
+  - otherwise → green **"This user looks clean (no detects)"**
+  The banner sits above the existing severity-count cards and is the
+  first thing visible on page load. No more skimming card counts to
+  decide if a player passed.
+- **Export button** in the report header (top-right). Pressing it
+  downloads a `mcss-report-<host>-<timestamp>.json` file containing
+  the full structured payload (counts, sections, findings, account
+  info, Discord accounts). The JSON is embedded at render time as a
+  `<script type="application/json">` tag, so the export works fully
+  offline from the saved HTML file — no network calls, no server.
+  Useful for archiving SS evidence or pasting into a staff-only
+  triage doc.
+- **`DiscordAccountScanner`** — reads Discord's
+  `Local Storage\leveldb\` `_remoteAuth_recentAccounts` entries from
+  the standard `%APPDATA%\discord` install plus the PTB / Canary
+  variants and pulls out the *public* fields of each signed-in
+  account: snowflake `userId`, `username`, optional `globalName`,
+  optional `avatarHash`, and which client variant the account was
+  found in. Falls back to the inline user objects in the redux state
+  cache when the recent-accounts list isn't populated. **Read-only,
+  public fields only — never reads tokens, DM contents, friend
+  lists, or chat messages.**
+- **Discord Accounts card** in the HTML report. Replaces the old
+  generic "Discord installations" card when at least one signed-in
+  account is found. Shows each account with its avatar (loaded from
+  Discord's CDN), display name, `@username`, snowflake ID with a
+  one-click copy button, and the client variant (Discord / PTB /
+  Canary) for non-default installs. Falls back to the v0.8.x
+  installation list when no account is signed in.
+- **`--no-discord` CLI flag** — disables `DiscordAccountScanner` for
+  staff who'd rather not pull leveldb on the player's machine. The
+  Discord installation card still renders.
+
+### Changed
+
+- `SessionReport` gained a `DiscordAccounts` list. `AccountInfo.cs`
+  gained a `DiscordAccount` record (`UserId`, `Username`,
+  `GlobalName`, `AvatarHash`, `ClientVariant`).
+- `ScanOptions` gained `NoDiscord`. `ScanOrchestrator` runs
+  `DiscordAccountScanner` between the existing Discord-install scan
+  and the rest of the pipeline when the flag is not set.
+- `HtmlReportRenderer` was extended (no scanner code touched) to
+  emit the verdict banner, the Export button, the embedded JSON
+  payload, and the new Discord Accounts card; `BuildJsonPayload()`
+  and `JsonStr()` (JSON-string escape with `<` → `\u003c` to avoid
+  `</script>` injection) are new helpers.
+
+### Compatibility
+
+- Existing CLI surface unchanged. The new `--no-discord` flag is
+  opt-out only; if it's not passed, the Discord scanner runs.
+- Reports rendered by v0.9.0 are still standalone, single-file HTML
+  with no external resources required. Avatar images load from the
+  Discord CDN over HTTPS; the rest of the report (banner, JSON
+  payload, Export button, the v0.8.x layout) works fully offline.
+
 ## [0.8.1] — 2026-05
 
 Quality-of-life fix for the Recycle Bin scanner. Reports from staff

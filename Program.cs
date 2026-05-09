@@ -82,6 +82,7 @@ internal static class Program
                 case "--no-startup":  optsBuilder.NoStartup   = true;         break;
                 case "--no-tasks":    optsBuilder.NoTasks     = true;         break;
                 case "--no-recent":   optsBuilder.NoRecent    = true;         break;
+                case "--no-discord":  optsBuilder.NoDiscord   = true;         break;
                 case "--report-only": reportOnly              = true;         break;
                 case "--vt-key":
                     if (i + 1 < args.Length) optsBuilder.VtKey = args[++i];
@@ -131,7 +132,7 @@ internal static class Program
     {
         public bool NoBrowser, NoRecycle, NoRegistry, NoPrefetch, NoUsn, NoDefender;
         public bool NoVt, NoHtml, NoPcInfo, NoAccounts, NoModrinth, NoLiveJvm, NoEngines;
-        public bool NoStartup, NoTasks, NoRecent;
+        public bool NoStartup, NoTasks, NoRecent, NoDiscord;
         public string? VtKey;
         public string? HtmlPathArg;
         public double RecycleWindowHours = 24.0;
@@ -143,7 +144,7 @@ internal static class Program
             NoVt = NoVt, NoHtml = NoHtml, NoPcInfo = NoPcInfo,
             NoAccounts = NoAccounts, NoModrinth = NoModrinth, NoLiveJvm = NoLiveJvm,
             NoEngines = NoEngines, NoStartup = NoStartup, NoTasks = NoTasks,
-            NoRecent = NoRecent, VtKey = VtKey, HtmlPathArg = HtmlPathArg,
+            NoRecent = NoRecent, NoDiscord = NoDiscord, VtKey = VtKey, HtmlPathArg = HtmlPathArg,
             RecycleWindowHours = RecycleWindowHours,
         };
     }
@@ -175,6 +176,7 @@ internal static class Program
         Console.WriteLine("  --no-startup       skip Startup folder scan");
         Console.WriteLine("  --no-tasks         skip Scheduled Task scan");
         Console.WriteLine("  --no-recent        skip Recent files scan");
+        Console.WriteLine("  --no-discord       skip Discord-account leveldb scan (account list only — no tokens / chats)");
         Console.WriteLine("  --no-browser       skip browser-history scan");
         Console.WriteLine("  --no-recycle       skip Recycle Bin scan");
         Console.WriteLine("  --recycle-window <H>  only scan Recycle Bin entries deleted within last <H> hours");
