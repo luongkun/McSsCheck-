@@ -4,6 +4,40 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.1] — 2026-05
+
+Hotfix for `MinecraftScanner` jar-entry blow-up. The very first
+v0.9.0 report from a tester returned **378 detects** because a
+single fat cheat-client jar in `versions/` contained ~250 cheat-named
+class entries — and v0.8.0's per-keyword report dedup couldn't merge
+them because every entry carried a different cheat keyword (`esp`,
+`scaffold`, `step`, `phase`, `regen`, …). v0.9.1 collapses these
+into a single per-jar finding so the headline detect count actually
+reflects the number of suspicious *files*, not the number of class
+entries inside them.
+
+### Changed
+
+- **`MinecraftScanner.InspectJar`** now emits at most **two**
+  aggregated findings per jar instead of one per matched zip entry:
+  - `Suspicious entries inside jar` — aggregates all `InternalKeywords`
+    matches into a single Hit, listing up to 12 sample entries
+    (and "... and N more") in the detail.
+  - `Cheat-named entries inside jar` — aggregates all `NameKeywords`
+    matches the same way.
+  Tags become the union of every distinct keyword that fired.
+  A jar with 258 matched entries now produces 1 card, not 258.
+- The `Hit` console output is also collapsed: instead of one line
+  per entry, scanners log the aggregated count and keyword list.
+
+### Compatibility
+
+- No flag changes. CLI, scan order, and other scanners are
+  unchanged. Existing `--no-discord` / `--recycle-window` flags
+  work identically.
+- Findings still carry the per-jar `FilePath` + sha256, so
+  downstream Modrinth / VirusTotal lookups remain unaffected.
+
 ## [0.9.0] — 2026-05
 
 Headline-readable verdict + JSON export + Discord account
