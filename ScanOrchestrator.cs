@@ -101,6 +101,8 @@ internal static class ScanOrchestrator
         if (!opts.NoUsn)       s.Add(("NTFS USN journal (deleted files)",  sync(sec => UsnJournalScanner.Run(sec))));
         if (!opts.NoDefender)  s.Add(("Windows Defender history",          sync(sec => DefenderLogScanner.Run(sec))));
         if (!opts.NoEngines)   s.Add(("Heuristic engines",                 sync(sec => HeuristicEngineScanner.Run(report, sec))));
+        if (!opts.NoExeScan)   s.Add(("Renamed-cheat detector (hash + content markers)",
+                                                                            sync(sec => CheatExeScanner.Run(sec))));
 
         // ---- Async network scanners ----
         s.Add(("Mods registry verification (Modrinth)",

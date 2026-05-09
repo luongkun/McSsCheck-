@@ -4,6 +4,71 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.3] — 2026-05
+
+Headline detection feature. Up to v0.9.2 every cheat-detection
+scanner trusted the *file name* — `vape.exe` matched because it
+was literally named "vape", `WurstClient.jar` matched on the same
+path keyword. Players who renamed `atermys loader.exe` to
+`Anydesk.exe` (or repacked a Doomsday jar with scrambled
+class names) walked straight past v0.9.2. v0.9.3 closes that
+hole with a content-based detector that ignores file names.
+
+### Added
+
+- **`CheatFingerprints`** — first-class data table of known cheat
+  fingerprints. Two complementary tiers:
+  - `KnownCheatHashes` — full-file SHA-256 lookups for cheat builds
+    confirmed in the wild (Atermys Client loader, Doomsday Client
+    jar, Slinky.gg crack zip + loader). Survives renames /
+    re-icons / re-signing.
+  - `BinaryMarkers` — distinctive ASCII / UTF-16-LE substrings
+    inside the binary (PDB paths, RTTI export names, branding
+    banners, log strings, channel URLs). Catches re-built /
+    repacked variants that don't share the bootstrap hash. Ships
+    seed entries for **Atermys, Slinky.gg, Doomsday, Wurst,
+    Sigma, Impact, LiquidBounce, RusherHack, Vape, Aristois,
+    Salhack, Konas, Wolfram, BleachHack, Future, Phobos, Moon,
+    Celestial, Kosen, plus generic loader / injector strings**.
+- **`BinaryMarkerScanner`** utility — reads up to 8 MB of a file
+  and runs the marker list against the bytes treated as Latin-1
+  (catches plain PE strings) and as UTF-16-LE (catches widechar
+  resources / `.NET ldstr` literals). Per-pattern dedup keeps
+  one marker hit per (cheat, variant) per file even when a
+  pattern repeats.
+- **`CheatExeScanner`** — walks the user-controlled folders
+  (Desktop, Downloads, Documents, Public, AppData, LocalAppData,
+  %TEMP%, profile root) and inspects every `.exe / .dll / .jar /
+  .zip` ≤ 200 MB. Two passes per file:
+  - SHA-256 → `KnownCheatHashes` lookup.
+  - Raw-bytes → `BinaryMarkerScanner.Scan` (and, for archives,
+    up to 64 entries each scanned with a 256 KB budget — catches
+    cheat banners that only live inside one bootstrap class of a
+    fat jar).
+  Each match emits a single `Severity.Hit` card per (file, cheat)
+  pair, tagged `cheat-exe` plus `hash-match` or `marker-match`.
+- **`--no-exe-scan` CLI flag** — opt out of `CheatExeScanner` for
+  staff who already triaged renamed-cheat files manually or who
+  don't want the extra few seconds the file walk costs on a slow
+  player machine.
+
+### Changed
+
+- `ScanOptions` gained `NoExeScan`. `ScanOrchestrator` runs
+  `CheatExeScanner` directly after `HeuristicEngineScanner` so
+  the renamed-cheat findings sit alongside the other
+  content-based heuristics in the report.
+
+### Compatibility
+
+- No breaking changes. Existing flags work unchanged.
+- The renamed-cheat detector is opt-out: omit `--no-exe-scan` to
+  use it (default), pass it to skip.
+- Findings are taggable / dedupe-able like every other scanner —
+  a player whose `Anydesk.exe` is the renamed Atermys loader will
+  collapse with the existing Process / Recent / Registry hits on
+  the same `atermys` keyword.
+
 ## [0.9.2] — 2026-05
 
 Quality-of-life fix for `BrowserHistoryScanner`. v0.9.1 reports

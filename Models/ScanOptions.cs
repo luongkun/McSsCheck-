@@ -24,6 +24,7 @@ internal sealed record ScanOptions
     public bool NoTasks     { get; init; }
     public bool NoRecent    { get; init; }
     public bool NoDiscord   { get; init; }
+    public bool NoExeScan   { get; init; }
     public string? VtKey       { get; init; }
     public string? HtmlPathArg { get; init; }
 
