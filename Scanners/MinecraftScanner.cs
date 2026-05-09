@@ -207,6 +207,20 @@ internal static class MinecraftScanner
             int sampledClasses = 0;
             bool hasProGuard = false, hasAllatori = false, hasObfuscatorMarker = false;
 
+            // v0.9.1: aggregate per-entry hits into a SINGLE finding per jar.
+            // Previous behaviour emitted one ScanResult per matched entry, which
+            // produced 200-300 Hit cards for a single fat cheat-client jar
+            // (one entry per cheat module class). Staff wanted "1 card = 1 jar".
+            // We still record up to MaxEntrySamples examples per kind so
+            // "Show details" remains useful for triage.
+            const int MaxEntrySamples = 12;
+            var internalKeywordHits = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            var nameKeywordHits     = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            var internalEntrySamples = new List<string>();
+            var nameEntrySamples     = new List<string>();
+            int internalEntryCount = 0;
+            int nameEntryCount     = 0;
+
             foreach (var entry in zip.Entries)
             {
                 var entryName = entry.FullName;
@@ -214,25 +228,19 @@ internal static class MinecraftScanner
                 var hits = KnownCheats.MatchKeywords(entryName, KnownCheats.InternalKeywords).ToList();
                 if (hits.Count > 0)
                 {
-                    ConsoleUI.Hit($"    internal entry hits [{string.Join(",", hits)}]: {entryName}");
-                    section.Add(new ScanResult(
-                        Source: SourceName, Severity: Severity.Hit,
-                        Title: "Suspicious entry inside jar",
-                        Detail: $"entry '{entryName}' matched: {string.Join(", ", hits)}",
-                        FilePath: jarPath, Hash: sha,
-                        Tags: hits.ToArray()));
+                    internalEntryCount++;
+                    foreach (var h in hits) internalKeywordHits.Add(h);
+                    if (internalEntrySamples.Count < MaxEntrySamples)
+                        internalEntrySamples.Add($"{entryName}  -> {string.Join(", ", hits)}");
                 }
 
                 var nameHits2 = KnownCheats.MatchKeywords(entryName, KnownCheats.NameKeywords).ToList();
                 if (nameHits2.Count > 0)
                 {
-                    ConsoleUI.Hit($"    internal entry hits [{string.Join(",", nameHits2)}]: {entryName}");
-                    section.Add(new ScanResult(
-                        Source: SourceName, Severity: Severity.Hit,
-                        Title: "Cheat-named entry inside jar",
-                        Detail: $"entry '{entryName}' matched: {string.Join(", ", nameHits2)}",
-                        FilePath: jarPath, Hash: sha,
-                        Tags: nameHits2.ToArray()));
+                    nameEntryCount++;
+                    foreach (var h in nameHits2) nameKeywordHits.Add(h);
+                    if (nameEntrySamples.Count < MaxEntrySamples)
+                        nameEntrySamples.Add($"{entryName}  -> {string.Join(", ", nameHits2)}");
                 }
 
                 if (entryName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
@@ -258,6 +266,42 @@ internal static class MinecraftScanner
                 if (lower.Contains("allatori")) hasAllatori = true;
                 if (lower.EndsWith(".class.encrypted") || lower.Contains("/stringer/") || lower.Contains("/zelix/"))
                     hasObfuscatorMarker = true;
+            }
+
+            // Emit ONE aggregated finding per kind, per jar.
+            if (internalEntryCount > 0)
+            {
+                var kwList = string.Join(", ", internalKeywordHits);
+                var sample = string.Join("\n  ", internalEntrySamples);
+                var more = internalEntryCount - internalEntrySamples.Count;
+                var detail = internalEntryCount == 1
+                    ? $"1 entry matched cheat-internal keywords [{kwList}] inside {fileName}\n  {sample}"
+                    : $"{internalEntryCount} entries matched cheat-internal keywords [{kwList}] inside {fileName}\n  {sample}"
+                      + (more > 0 ? $"\n  ... and {more} more" : "");
+                ConsoleUI.Hit($"    {internalEntryCount} suspicious entr{(internalEntryCount == 1 ? "y" : "ies")} inside jar [{kwList}]: {fileName}");
+                section.Add(new ScanResult(
+                    Source: SourceName, Severity: Severity.Hit,
+                    Title: "Suspicious entries inside jar",
+                    Detail: detail,
+                    FilePath: jarPath, Hash: sha,
+                    Tags: internalKeywordHits.ToArray()));
+            }
+            if (nameEntryCount > 0)
+            {
+                var kwList = string.Join(", ", nameKeywordHits);
+                var sample = string.Join("\n  ", nameEntrySamples);
+                var more = nameEntryCount - nameEntrySamples.Count;
+                var detail = nameEntryCount == 1
+                    ? $"1 entry matched cheat-name keywords [{kwList}] inside {fileName}\n  {sample}"
+                    : $"{nameEntryCount} entries matched cheat-name keywords [{kwList}] inside {fileName}\n  {sample}"
+                      + (more > 0 ? $"\n  ... and {more} more" : "");
+                ConsoleUI.Hit($"    {nameEntryCount} cheat-named entr{(nameEntryCount == 1 ? "y" : "ies")} inside jar [{kwList}]: {fileName}");
+                section.Add(new ScanResult(
+                    Source: SourceName, Severity: Severity.Hit,
+                    Title: "Cheat-named entries inside jar",
+                    Detail: detail,
+                    FilePath: jarPath, Hash: sha,
+                    Tags: nameKeywordHits.ToArray()));
             }
 
             if (totalClass > 0)
