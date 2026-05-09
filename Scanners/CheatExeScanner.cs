@@ -57,6 +57,12 @@ internal static class CheatExeScanner
         if (roots.Count == 0)
         {
             ConsoleUI.Dim("  no scoped folders found");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Ok,
+                Title: "Renamed-cheat detector: no scoped folders found",
+                Detail: "Could not resolve any of Desktop / Downloads / Documents / "
+                      + "Public / AppData / LocalAppData / %TEMP% / profile root.",
+                Tags: new[] { "cheat-exe", "scan-summary" }));
             return;
         }
 
@@ -65,6 +71,10 @@ internal static class CheatExeScanner
         // doesn't double-emit findings.
         var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int totalFiles = 0, hashHits = 0, markerHits = 0;
+        long totalBytes = 0;
+        var perExt = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var perRoot = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var rootEnumerationErrors = new List<string>();
 
         var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -81,12 +91,16 @@ internal static class CheatExeScanner
             catch (Exception ex)
             {
                 ConsoleUI.Dim($"  cannot enumerate {root}: {ex.Message}");
+                rootEnumerationErrors.Add($"{root}: {ex.Message}");
                 continue;
             }
 
+            int rootFileCount = 0;
+
             foreach (var file in files)
             {
-                if (!exts.Contains(Path.GetExtension(file))) continue;
+                var ext = Path.GetExtension(file);
+                if (!exts.Contains(ext)) continue;
                 if (!visitedPaths.Add(file)) continue;
 
                 FileInfo fi;
@@ -95,6 +109,9 @@ internal static class CheatExeScanner
                 if (fi.Length <= 0 || fi.Length > MaxFileBytes) continue;
 
                 totalFiles++;
+                rootFileCount++;
+                totalBytes += fi.Length;
+                perExt[ext] = (perExt.TryGetValue(ext, out var c) ? c : 0) + 1;
 
                 // ---- Hash lookup ----
                 string? sha256 = null;
@@ -153,12 +170,51 @@ internal static class CheatExeScanner
                         Tags: new[] { "cheat-exe", "marker-match", LabelSlug(cheat) }));
                 }
             }
+
+            perRoot[root] = rootFileCount;
         }
 
+        // Emit a single Info "scan summary" card so the user can tell what
+        // the scanner actually walked. Without this, a clean machine looks
+        // identical to a broken scanner that didn't visit any folders.
+        var perRootText = string.Join("\n", perRoot
+            .OrderByDescending(kv => kv.Value)
+            .Select(kv => $"  - {kv.Key}: {kv.Value} candidate file(s)"));
+        var perExtText  = string.Join(", ", perExt
+            .OrderByDescending(kv => kv.Value)
+            .Select(kv => $"{kv.Key}={kv.Value}"));
+        var errorsText  = rootEnumerationErrors.Count == 0
+            ? ""
+            : "\nEnumeration errors:\n  - " + string.Join("\n  - ", rootEnumerationErrors);
+
+        var summaryDetail =
+            $"folders walked: {perRoot.Count}\n" +
+            $"candidate files: {totalFiles} ({totalBytes / (1024 * 1024)} MiB)\n" +
+            (perExt.Count == 0 ? "" : $"by extension: {perExtText}\n") +
+            $"hash hits: {hashHits}\n" +
+            $"marker hits: {markerHits}\n" +
+            (perRoot.Count == 0 ? "" : "\nPer-folder counts:\n" + perRootText) +
+            errorsText;
+
         if (totalFiles == 0)
+        {
             ConsoleUI.Dim("  no candidate exe/dll/jar/zip files in scoped folders");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Info,
+                Title: "Renamed-cheat detector: no candidate files in scoped folders",
+                Detail: summaryDetail,
+                Tags: new[] { "cheat-exe", "scan-summary" }));
+        }
         else
+        {
             ConsoleUI.Info($"  scanned {totalFiles} file(s); hash hits={hashHits}, marker hits={markerHits}");
+            section.Add(new ScanResult(
+                Source: SourceName, Severity: Severity.Info,
+                Title: $"Renamed-cheat detector summary: {totalFiles} file(s) scanned, "
+                     + $"{hashHits} hash hit(s), {markerHits} marker hit(s)",
+                Detail: summaryDetail,
+                Tags: new[] { "cheat-exe", "scan-summary" }));
+        }
     }
 
     /// <summary>
