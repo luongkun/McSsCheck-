@@ -26,10 +26,10 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishReadyToRun>false</PublishReadyToRun>
 
-    <Version>0.9.3</Version>
-    <AssemblyVersion>0.9.3.0</AssemblyVersion>
-    <FileVersion>0.9.3.0</FileVersion>
-    <InformationalVersion>0.9.3</InformationalVersion>
+    <Version>0.9.4</Version>
+    <AssemblyVersion>0.9.4.0</AssemblyVersion>
+    <FileVersion>0.9.4.0</FileVersion>
+    <InformationalVersion>0.9.4</InformationalVersion>
     <Product>McSsCheck</Product>
     <Description>Minecraft screenshare helper: scans well-known cheat-client artifacts on the player's machine. Output is local only (with optional Modrinth / VirusTotal hash verification). Ships a Windows Forms GUI by default; --console for the legacy console mode.</Description>
   </PropertyGroup>

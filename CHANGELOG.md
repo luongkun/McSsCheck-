@@ -4,6 +4,56 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.4] — 2026-05
+
+Visibility patch on top of v0.9.3. Two complaints from the first
+v0.9.3 user:
+1. **Discord Accounts (0)** — even though the in-app Switch-account
+   menu listed signed-in accounts, the report showed zero.
+2. **Cheat-exe scanner silent on success** — when the renamed-cheat
+   detector ran but hit nothing, the section was empty in the
+   report, so the user couldn't tell whether it had actually walked
+   any folders or just bailed out.
+
+### Changed
+
+- **`DiscordAccountScanner` deepened.** Up to v0.9.3 we only read
+  `Local Storage\leveldb\*.log` (a single file) — modern Discord
+  builds rotate that data into `.ldb` snappy-tables almost
+  immediately, leaving the log empty. v0.9.4 now scans:
+  - `Local Storage\leveldb\*.log` and `*.ldb` (snappy-framed but
+    JSON literals usually survive),
+  - `Session Storage\` (per-session redux state cache),
+  - `IndexedDB\` recursively (per-origin leveldb folders such as
+    `https_discord.com_0.indexeddb.leveldb/`),
+  - the manifest files for completeness.
+  Bytes are decoded both as UTF-8 and as UTF-16-LE so widechar
+  resources hit the regex too.
+- **New extraction strategy.** Added a `MULTI_ACCOUNT_STORE`
+  pattern alongside the existing `_remoteAuth_recentAccounts` and
+  inline-`{"id":..,"username":..}` patterns, and a per-id merge
+  step that backfills `global_name` / `avatar` from later strategies.
+- **Discord scan now emits a "scan summary" Info card** when no
+  account is found, listing per-variant file counts (Discord /
+  PTB / Canary / Development) so the user can tell whether the
+  scanner walked anything at all vs. found data and chose not to
+  match.
+- **`CheatExeScanner` gained a "scan summary" Info card** at the
+  end of every run, regardless of detect count. The card lists:
+  - folders walked + total candidate files / bytes,
+  - per-extension breakdown (`.exe`, `.dll`, `.jar`, `.zip`),
+  - hash hits + marker hits,
+  - per-folder counts (which roots had how many candidates),
+  - any enumeration errors (e.g. permission denied on a folder).
+  This is the difference between "scanner was a no-op" and
+  "scanner walked 12 000 files in Downloads, found nothing
+  matching the DB" — staff can now tell which case they're in.
+
+### Compatibility
+
+- No breaking changes. No new flags. Existing CLI surface and
+  scanner ordering identical to v0.9.3.
+
 ## [0.9.3] — 2026-05
 
 Headline detection feature. Up to v0.9.2 every cheat-detection
