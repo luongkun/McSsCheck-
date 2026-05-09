@@ -4,6 +4,48 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.8.1] — 2026-05
+
+Quality-of-life fix for the Recycle Bin scanner. Reports from staff
+were complaining that this section took the longest of any scanner on
+machines that hoard a full Recycle Bin (uninstall leftovers, app
+updates, year-old downloads). For the screenshare cheat-detection use
+case only the *recent* deletions matter — the suspicious behaviour is
+"the player wiped a jar/exe just before the SS started", not "the
+player has had a forgotten cheat in the trash since last summer".
+
+### Changed
+
+- **Recycle Bin scanner** now defaults to a **24-hour window**: only
+  files whose `LastWriteTime` (which Windows uses as the deletion
+  timestamp for `$Recycle.Bin/$R*` entries) is within the last 24 h
+  are scanned for cheat keywords. Older entries are counted as
+  "skipped" and don't run a keyword match. The section header now
+  reads `Recycle Bin (jar / Minecraft files, deleted within last 24h)`
+  and the final OK message reports `(N recent, M older skipped)` so
+  staff can see at a glance how much was filtered.
+- **Stat call optimised**. The per-file `new FileInfo(file)`
+  allocation has been replaced with `File.GetLastWriteTime(file)` for
+  the date check. `FileInfo` is only constructed for files that
+  actually match a cheat keyword (to read `Length` for the report).
+  On a 5 000-entry recycle bin this cuts the scanner's wall time
+  roughly in half.
+
+### Added
+
+- **`--recycle-window <H>` flag.** Override the default 24-hour
+  window: `--recycle-window 6` only looks at deletions within the
+  last 6 hours, `--recycle-window 168` widens to a week. Pass
+  **`--recycle-window 0`** to restore the v0.8.0 behaviour and scan
+  every entry regardless of age.
+
+### Compatibility
+
+- No breaking changes. Tightening the default window is the only
+  behaviour change vs. v0.8.0; if a staff member specifically wants
+  the legacy full scan they can pass `--recycle-window 0`. All other
+  flags work unchanged.
+
 ## [0.8.0] — 2026-05
 
 The "less is more" release. The v0.7.0 report fired a card for every

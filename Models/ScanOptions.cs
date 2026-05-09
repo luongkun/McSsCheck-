@@ -25,4 +25,12 @@ internal sealed record ScanOptions
     public bool NoRecent    { get; init; }
     public string? VtKey       { get; init; }
     public string? HtmlPathArg { get; init; }
+
+    /// <summary>
+    /// How many hours back the Recycle Bin scanner should look. Files deleted
+    /// before this window are skipped, both for performance (no keyword match
+    /// per file) and to keep the report focused on "deleted just before SS"
+    /// behaviour. <c>0</c> restores the legacy full-scan behaviour. Default 24h.
+    /// </summary>
+    public double RecycleWindowHours { get; init; } = 24.0;
 }
