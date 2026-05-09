@@ -31,6 +31,13 @@ public sealed class SessionReport
     /// <summary>Discord client installations (presence only — no chat / token data).</summary>
     public List<DiscordInstall> DiscordInstalls { get; } = new();
 
+    /// <summary>
+    /// Discord accounts that have signed into the client on this machine.
+    /// Pulled from <c>Local Storage\leveldb\_remoteAuth_recentAccounts</c> —
+    /// only the public fields (user ID / username / avatar hash) are read.
+    /// </summary>
+    public List<DiscordAccount> DiscordAccounts { get; } = new();
+
     /// <summary>Mod jars discovered under .minecraft/mods (and versions/) with optional registry verification.</summary>
     public List<ModEntry> Mods { get; } = new();
 

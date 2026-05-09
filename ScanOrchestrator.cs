@@ -90,6 +90,7 @@ internal static class ScanOrchestrator
         if (!opts.NoLiveJvm)   s.Add(("Live JVM classpath",                sync(sec => LiveJvmScanner.Run(report, sec))));
                                 s.Add(("Minecraft installations and mods", sync(sec => MinecraftScanner.Run(report, sec))));
         if (!opts.NoAccounts)  s.Add(("Alternative Minecraft accounts",    sync(sec => AltAccountScanner.Run(report, sec))));
+        if (!opts.NoDiscord)   s.Add(("Discord accounts",                  sync(sec => DiscordAccountScanner.Run(report, sec))));
         if (!opts.NoRecycle)   s.Add(("Recycle Bin",                       sync(sec => RecycleBinScanner.Run(sec))));
         if (!opts.NoPrefetch)  s.Add(("Windows Prefetch",                  sync(sec => PrefetchScanner.Run(sec))));
         if (!opts.NoRegistry)  s.Add(("Registry artifacts",                sync(sec => RegistryScanner.Run(sec))));
