@@ -30,6 +30,11 @@ internal static class ScanOrchestrator
     {
         var report = new SessionReport { ToolVersion = Program.Version };
 
+        // Push global per-scanner config from opts onto the static scanner state
+        // before BuildSteps runs. Keep this list small — most scanners don't
+        // need any tuning knobs.
+        RecycleBinScanner.WindowHours = opts.RecycleWindowHours;
+
         var steps = BuildSteps(opts, report);
         progress.Begin(steps.Count);
 

@@ -91,6 +91,18 @@ internal static class Program
                     if (i + 1 < args.Length) optsBuilder.HtmlPathArg = args[++i];
                     else { return BadArg("--html-path needs a value"); }
                     break;
+                case "--recycle-window":
+                    if (i + 1 < args.Length)
+                    {
+                        var raw = args[++i];
+                        if (!double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out var hours)
+                            || hours < 0)
+                            return BadArg($"--recycle-window expects a non-negative number of hours, got '{raw}'");
+                        optsBuilder.RecycleWindowHours = hours;
+                    }
+                    else { return BadArg("--recycle-window needs a value (hours)"); }
+                    break;
                 case "-h":
                 case "--help":        printHelp = true; break;
                 default:
@@ -122,6 +134,7 @@ internal static class Program
         public bool NoStartup, NoTasks, NoRecent;
         public string? VtKey;
         public string? HtmlPathArg;
+        public double RecycleWindowHours = 24.0;
 
         public ScanOptions Build() => new()
         {
@@ -131,6 +144,7 @@ internal static class Program
             NoAccounts = NoAccounts, NoModrinth = NoModrinth, NoLiveJvm = NoLiveJvm,
             NoEngines = NoEngines, NoStartup = NoStartup, NoTasks = NoTasks,
             NoRecent = NoRecent, VtKey = VtKey, HtmlPathArg = HtmlPathArg,
+            RecycleWindowHours = RecycleWindowHours,
         };
     }
 
@@ -163,6 +177,8 @@ internal static class Program
         Console.WriteLine("  --no-recent        skip Recent files scan");
         Console.WriteLine("  --no-browser       skip browser-history scan");
         Console.WriteLine("  --no-recycle       skip Recycle Bin scan");
+        Console.WriteLine("  --recycle-window <H>  only scan Recycle Bin entries deleted within last <H> hours");
+        Console.WriteLine("                       (default 24; 0 = full scan, legacy behaviour)");
         Console.WriteLine("  --no-registry      skip registry scan");
         Console.WriteLine("  --no-prefetch      skip Prefetch scan");
         Console.WriteLine("  --no-usn           skip NTFS USN journal scan");
