@@ -4,6 +4,35 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.2] — 2026-05
+
+Quality-of-life fix for `BrowserHistoryScanner`. v0.9.1 reports
+sometimes had ~10–20 separate "Cheat-client domain in browser
+history" cards for one player (one per matched URL across one or
+more browser profiles). v0.9.2 collapses them into **a single card
+sorted newest-first**, matching the v0.9.1 jar-aggregation pattern.
+
+### Changed
+
+- **`BrowserHistoryScanner`** now emits at most **one** aggregated
+  finding per scan, listing up to 25 most-recent visits to
+  cheat-client domains across Chrome / Edge / Brave / Opera /
+  Vivaldi / Firefox profiles. Older visits collapse into a
+  `... and N more older visit(s)` line.
+- Each row in the detail block is formatted as
+  `YYYY-MM-DD HH:mm  [Browser / Profile]  url  -> matched-keywords  page-title`.
+  Visits are sorted by `last_visit_time` descending so staff see
+  the most recent activity first.
+- Tags become the union of every distinct cheat-domain keyword
+  that fired, so cross-source dedup with USN / Recent / Registry
+  continues to work.
+
+### Compatibility
+
+- No flag changes; identical to v0.9.1 except for the report card
+  layout. Console output still logs each match individually for
+  triage, but the HTML report shows one aggregated card.
+
 ## [0.9.1] — 2026-05
 
 Hotfix for `MinecraftScanner` jar-entry blow-up. The very first
