@@ -108,5 +108,35 @@ internal static class CheatFingerprints
         // even if we don't recognise the specific cheat.
         new("Generic Loader", "blackbone-rtti", "blackbone"),
         new("Generic Loader", "vmt-hook",       "VMTHook"),
+
+        // ---------------- Added v0.9.5 ----------------
+        // Koid Client — 2025-2026 ghost client. Agent-style jar.
+        new("Koid Client",    "branding",       "Koid Client"),
+        new("Koid Client",    "class-prefix",   "dev/koid/"),
+        new("Koid Client",    "agent-ident",    "koid-agent"),
+        new("Koid Client",    "logger-tag",     "[Koid]"),
+
+        // Weave MC — popular open-source cheat-mod loader (java agent).
+        new("Weave Loader",   "branding",       "Weave Loader"),
+        new("Weave Loader",   "class-prefix",   "net/weavemc/"),
+        new("Weave Loader",   "loader-tag",     "weave-loader-agent"),
+
+        // Orion Client (rebrand of Future, circulated 2025).
+        new("Orion Client",   "branding",       "Orion Client"),
+        new("Orion Client",   "legacy-note",    "orion-based on future"),
+
+        // Zenith Client — distributed via Discord 2026.
+        new("Zenith Client",  "branding",       "Zenith Client"),
+
+        // Atermys extra markers — older & newer loader builds.
+        new("Atermys Client", "config-header",  "atermys-config-v"),
+        new("Atermys Client", "overlay-title",  "atermys overlay"),
+
+        // Slinky.gg extra markers — newer packaged builds.
+        new("Slinky.gg",      "injector-tag",   "SlinkyInjector"),
+        new("Slinky.gg",      "config-marker",  "slinky_config"),
+
+        // Doomsday extra — premain class signature seen on recent builds.
+        new("Doomsday",       "premain-class",  "net.java.f"),
     };
 }

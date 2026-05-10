@@ -167,7 +167,7 @@ internal static class ProcessScanner
     private static IEnumerable<string> ExtractJavaAgents(string? cmd)
     {
         if (string.IsNullOrEmpty(cmd)) yield break;
-        foreach (var tok in TokenizeCmdline(cmd))
+        foreach (var tok in CmdlineTokenizer.Tokenize(cmd))
         {
             if (tok.StartsWith("-javaagent:", StringComparison.OrdinalIgnoreCase))
                 yield return tok.Substring("-javaagent:".Length);
@@ -175,23 +175,7 @@ internal static class ProcessScanner
     }
 
     private static IEnumerable<string> TokenizeCmdline(string? cmd)
-    {
-        if (string.IsNullOrEmpty(cmd)) yield break;
-
-        var current = new System.Text.StringBuilder();
-        bool inQuotes = false;
-        foreach (var c in cmd)
-        {
-            if (c == '"') { inQuotes = !inQuotes; continue; }
-            if (char.IsWhiteSpace(c) && !inQuotes)
-            {
-                if (current.Length > 0) { yield return current.ToString(); current.Clear(); }
-                continue;
-            }
-            current.Append(c);
-        }
-        if (current.Length > 0) yield return current.ToString();
-    }
+        => CmdlineTokenizer.Tokenize(cmd);
 
     private static bool LooksSuspiciousAgentPath(string path)
     {

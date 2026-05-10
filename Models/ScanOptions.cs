@@ -25,6 +25,8 @@ internal sealed record ScanOptions
     public bool NoRecent    { get; init; }
     public bool NoDiscord   { get; init; }
     public bool NoExeScan   { get; init; }
+    /// <summary>Disable <see cref="Scanners.JavaAgentScanner"/> (Premain/Agent-Class manifest check).</summary>
+    public bool NoAgentScan { get; init; }
     public string? VtKey       { get; init; }
     public string? HtmlPathArg { get; init; }
 
