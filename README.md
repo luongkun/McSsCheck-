@@ -182,6 +182,21 @@ McSsCheck.exe --help                # show all flags
    ~4 req/min and 500/day, so the tool throttles itself and caps at 24
    lookups per session.
 
+## What's new in v0.9.6
+
+- **"Internet Explorer 11 is no longer supported" popup no longer blocks
+  the report.** Previously, clicking **Open HTML report** on a Windows
+  Server / locked-down VM where `.html` was still associated with IE11
+  popped an "IE is retired" dialog and nothing opened. v0.9.6 walks a
+  smarter fallback ladder — resolves the user's real default-browser
+  choice from the registry (skipping any IE-looking ProgId), otherwise
+  launches Edge / Chrome / Brave / Firefox / Vivaldi / Opera from their
+  known install paths, and last-resort shows the file in Explorer so
+  the staff member can drag it into a browser manually.
+- **GUI: new "Show in folder" button** next to "Open HTML report" —
+  always opens Explorer with the report highlighted, as a reliable
+  fallback on any Windows install.
+
 ## What's new in v0.9.5
 
 - **New `JavaAgentScanner`.** Reads `META-INF/MANIFEST.MF` from

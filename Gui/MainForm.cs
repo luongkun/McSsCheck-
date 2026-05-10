@@ -49,6 +49,7 @@ internal sealed class MainForm : Form
     private readonly Button       _btnStart;
     private readonly Button       _btnCancel;
     private readonly Button       _btnOpenReport;
+    private readonly Button       _btnShowReport;
     private readonly Button       _btnClose;
 
     private string? _htmlReportPath;
@@ -137,6 +138,7 @@ internal sealed class MainForm : Form
         _btnStart      = MakeButton("Start scan",       primary: true);
         _btnCancel     = MakeButton("Cancel",           primary: false);
         _btnOpenReport = MakeButton("Open HTML report", primary: false);
+        _btnShowReport = MakeButton("Show in folder",   primary: false);
         _btnClose      = MakeButton("Close",            primary: false);
 
         _btnStart.Click      += (_, __) => StartRequested?.Invoke(this, EventArgs.Empty);
@@ -146,10 +148,16 @@ internal sealed class MainForm : Form
             if (!string.IsNullOrEmpty(_htmlReportPath))
                 HtmlReportRenderer.OpenInBrowser(_htmlReportPath);
         };
+        _btnShowReport.Click += (_, __) =>
+        {
+            if (!string.IsNullOrEmpty(_htmlReportPath))
+                HtmlReportRenderer.ShowInFolder(_htmlReportPath);
+        };
         _btnClose.Click += (_, __) => Close();
 
-        // RTL flow → reverse the visual order: Close | Open Report | Cancel | Start
+        // RTL flow → reverse the visual order: Close | Show in folder | Open Report | Cancel | Start
         btnPanel.Controls.Add(_btnClose);
+        btnPanel.Controls.Add(_btnShowReport);
         btnPanel.Controls.Add(_btnOpenReport);
         btnPanel.Controls.Add(_btnCancel);
         btnPanel.Controls.Add(_btnStart);
@@ -195,31 +203,31 @@ internal sealed class MainForm : Form
 
     private void SetState(UiState s)
     {
+        // "Show in folder" should mirror "Open HTML report" — both need a path.
+        bool havePath = !string.IsNullOrEmpty(_htmlReportPath);
         switch (s)
         {
             case UiState.Idle:
                 _btnStart.Enabled      = true;
                 _btnCancel.Enabled     = false;
                 _btnOpenReport.Enabled = false;
+                _btnShowReport.Enabled = false;
                 _btnClose.Enabled      = true;
                 break;
             case UiState.Running:
                 _btnStart.Enabled      = false;
                 _btnCancel.Enabled     = true;
                 _btnOpenReport.Enabled = false;
+                _btnShowReport.Enabled = false;
                 _btnClose.Enabled      = false;
                 break;
             case UiState.Done:
-                _btnStart.Enabled      = false;
-                _btnCancel.Enabled     = false;
-                _btnOpenReport.Enabled = !string.IsNullOrEmpty(_htmlReportPath);
-                _btnClose.Enabled      = true;
-                break;
             case UiState.Cancelled:
             case UiState.Failed:
                 _btnStart.Enabled      = false;
                 _btnCancel.Enabled     = false;
-                _btnOpenReport.Enabled = !string.IsNullOrEmpty(_htmlReportPath);
+                _btnOpenReport.Enabled = havePath;
+                _btnShowReport.Enabled = havePath;
                 _btnClose.Enabled      = true;
                 break;
         }

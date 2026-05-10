@@ -8,6 +8,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using McSsCheck.Models;
 using McSsCheck.Util;
+using Microsoft.Win32;
 
 namespace McSsCheck.Reports;
 
@@ -23,18 +24,296 @@ internal static class HtmlReportRenderer
         return outputPath;
     }
 
-    public static void OpenInBrowser(string filePath)
+    /// <summary>
+    /// Open Explorer on the folder containing the report, with the file
+    /// already selected. Used as a fallback from the GUI so the staff
+    /// member can always get at the HTML file even when no browser is
+    /// installed (or when every browser launch path failed).
+    /// </summary>
+    public static void ShowInFolder(string filePath)
     {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            ConsoleUI.Warn("Report path is empty — nothing to show.");
+            return;
+        }
         try
         {
-            var psi = new ProcessStartInfo { FileName = filePath, UseShellExecute = true };
-            Process.Start(psi);
+            if (File.Exists(filePath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName        = "explorer.exe",
+                    Arguments       = $"/select,\"{filePath}\"",
+                    UseShellExecute = false,
+                })?.Dispose();
+                return;
+            }
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName        = "explorer.exe",
+                    Arguments       = $"\"{dir}\"",
+                    UseShellExecute = false,
+                })?.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            ConsoleUI.Warn($"Could not open containing folder: {ex.Message}");
+            ConsoleUI.Info($"Report path: {filePath}");
+        }
+    }
+
+    /// <summary>
+    /// Opens the generated HTML report in a real modern browser, carefully
+    /// avoiding Internet Explorer 11 (which Microsoft disabled in 2022 but
+    /// which is still the fallback for <c>.html</c> on some locked-down
+    /// VMs / Server SKUs — on those machines a plain shell-execute of the
+    /// file pops an "Internet Explorer 11 is no longer supported" dialog
+    /// and never opens the report).
+    ///
+    /// Resolution order:
+    ///   1. The user's <c>UserChoice</c> association for the <c>http</c>
+    ///      protocol — this is the browser Windows uses when the user
+    ///      clicks a web link. We resolve that ProgId to the ShellOpen
+    ///      command and run it with <c>file://</c> URL of the report.
+    ///   2. Well-known install paths for Edge / Chrome / Brave / Firefox /
+    ///      Opera / Vivaldi — covers vanilla Win10 / Win11 where Edge is
+    ///      pre-installed even when the HTML association is broken.
+    ///   3. <c>explorer.exe &lt;file&gt;</c> — opens whatever the shell
+    ///      thinks should handle HTML (might still be IE11 on the
+    ///      unluckiest machines, but at that point the user clearly has
+    ///      no working browser at all).
+    ///   4. <c>explorer.exe /select,&lt;file&gt;</c> — last resort: show
+    ///      the file in Explorer so the staff member can drag it into a
+    ///      browser window manually.
+    /// </summary>
+    public static void OpenInBrowser(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        {
+            ConsoleUI.Warn($"Report file not found: {filePath}");
+            return;
+        }
+
+        // file:/// URL is what every real browser accepts on the command
+        // line. Using the plain path works too, but a URL avoids quoting
+        // issues with paths that contain spaces or Unicode.
+        var fileUrl = new Uri(filePath).AbsoluteUri;
+
+        // 1) User's default HTML / http:// handler.
+        if (TryLaunchUserDefaultHandler(fileUrl, filePath)) return;
+
+        // 2) Hardcoded browser install paths.
+        if (TryLaunchKnownBrowser(fileUrl)) return;
+
+        // 3) explorer.exe <file> — still file-association based, but it
+        //    goes through the shell's "open document" path, which on
+        //    modern Windows rarely lands on IE.
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo
+            {
+                FileName        = "explorer.exe",
+                Arguments       = $"\"{filePath}\"",
+                UseShellExecute = false,
+            });
+            if (p != null) return;
+        }
+        catch (Exception ex)
+        {
+            ConsoleUI.Dim($"explorer.exe open failed: {ex.Message}");
+        }
+
+        // 4) explorer.exe /select,<file> — highlight the file in Explorer
+        //    so the user can double-click it manually.
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName        = "explorer.exe",
+                Arguments       = $"/select,\"{filePath}\"",
+                UseShellExecute = false,
+            })?.Dispose();
+            ConsoleUI.Warn("Could not find a real browser to open the HTML report.");
+            ConsoleUI.Info($"Opened the containing folder instead. Drag the file into a browser window: {filePath}");
         }
         catch (Exception ex)
         {
             ConsoleUI.Warn($"Could not open report in browser: {ex.Message}");
             ConsoleUI.Info($"Open manually: {filePath}");
         }
+    }
+
+    /// <summary>
+    /// Try to launch the browser the user has picked as the default HTML /
+    /// http:// handler. Windows stores two separate user choices:
+    ///   * <c>HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.html\UserChoice\ProgId</c>
+    ///     — the "Open with" the user picked for .html files.
+    ///   * <c>HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice\ProgId</c>
+    ///     — the browser for web links.
+    /// We check both (html first, http as a fallback), resolve the ProgId
+    /// to its ShellOpen command via HKCR, and run it with a <c>file://</c>
+    /// URL of the report. Any ProgId that looks like Internet Explorer is
+    /// skipped so we don't land on the "no longer supported" dialog.
+    /// </summary>
+    private static bool TryLaunchUserDefaultHandler(string fileUrl, string filePath)
+    {
+        string[] userChoicePaths =
+        {
+            @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.html\UserChoice",
+            @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.htm\UserChoice",
+            @"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+            @"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
+        };
+
+        foreach (var userChoicePath in userChoicePaths)
+        {
+            try
+            {
+                string? progId;
+                using (var key = Registry.CurrentUser.OpenSubKey(userChoicePath))
+                {
+                    progId = key?.GetValue("ProgId") as string;
+                }
+                if (string.IsNullOrWhiteSpace(progId)) continue;
+
+                // Skip IE-family ProgIds — otherwise we hit the
+                // "Internet Explorer 11 is no longer supported" dialog.
+                var progIdLower = progId.ToLowerInvariant();
+                if (progIdLower.StartsWith("ie.") ||
+                    progIdLower.Contains("iexplore") ||
+                    progIdLower.Contains("internetexplorer"))
+                {
+                    ConsoleUI.Dim($"default handler for '{userChoicePath}' is IE ({progId}); skipping.");
+                    continue;
+                }
+
+                string? commandTemplate;
+                using (var cmdKey = Registry.ClassesRoot.OpenSubKey(
+                    $@"{progId}\shell\open\command"))
+                {
+                    commandTemplate = cmdKey?.GetValue(null) as string;
+                }
+                if (string.IsNullOrWhiteSpace(commandTemplate)) continue;
+
+                // For .html ProgIds the template is usually "...browser.exe" "%1"
+                // and we should pass the raw file path; for http/https ProgIds
+                // it expects a URL. Try file path first for the .html paths,
+                // file URL for the url ones.
+                bool isFileExt = userChoicePath.Contains("FileExts", StringComparison.Ordinal);
+                var target = isFileExt ? filePath : fileUrl;
+
+                var (exe, args) = SplitCommandLine(commandTemplate, target);
+                if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) continue;
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName        = exe,
+                    Arguments       = args,
+                    UseShellExecute = false,
+                })?.Dispose();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConsoleUI.Dim($"UserChoice launch via '{userChoicePath}' failed: {ex.Message}");
+            }
+        }
+        return false;
+    }
+
+    /// <summary>Iterate the known per-browser install paths until one exists + launches.</summary>
+    private static bool TryLaunchKnownBrowser(string fileUrl)
+    {
+        var pf   = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        // Ordered: Edge first (always present on modern Windows), then
+        // the other popular browsers in declining market-share order.
+        string[] candidates =
+        {
+            Path.Combine(pf,    @"Microsoft\Edge\Application\msedge.exe"),
+            Path.Combine(pf86,  @"Microsoft\Edge\Application\msedge.exe"),
+            Path.Combine(pf,    @"Google\Chrome\Application\chrome.exe"),
+            Path.Combine(pf86,  @"Google\Chrome\Application\chrome.exe"),
+            Path.Combine(local, @"Google\Chrome\Application\chrome.exe"),
+            Path.Combine(pf,    @"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            Path.Combine(pf86,  @"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            Path.Combine(pf,    @"Mozilla Firefox\firefox.exe"),
+            Path.Combine(pf86,  @"Mozilla Firefox\firefox.exe"),
+            Path.Combine(pf,    @"Vivaldi\Application\vivaldi.exe"),
+            Path.Combine(pf86,  @"Vivaldi\Application\vivaldi.exe"),
+            Path.Combine(pf,    @"Opera\launcher.exe"),
+            Path.Combine(pf86,  @"Opera\launcher.exe"),
+        };
+
+        foreach (var exe in candidates)
+        {
+            if (!File.Exists(exe)) continue;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName        = exe,
+                    Arguments       = $"\"{fileUrl}\"",
+                    UseShellExecute = false,
+                })?.Dispose();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConsoleUI.Dim($"failed to launch {Path.GetFileName(exe)}: {ex.Message}");
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Split a registry ShellOpen command template like
+    /// <c>"C:\Program Files\...\msedge.exe" --single-argument %1</c> into the
+    /// exe path and the remaining arguments, substituting %1 (and %L) with
+    /// the file URL. Quoted paths are handled.
+    /// </summary>
+    private static (string exe, string args) SplitCommandLine(string template, string fileUrl)
+    {
+        template = template.Trim();
+        string exe;
+        string tail;
+        if (template.StartsWith("\""))
+        {
+            int end = template.IndexOf('"', 1);
+            if (end < 0) return ("", "");
+            exe  = template.Substring(1, end - 1);
+            tail = template.Substring(end + 1).TrimStart();
+        }
+        else
+        {
+            int sp = template.IndexOf(' ');
+            if (sp < 0) { exe = template; tail = ""; }
+            else        { exe = template.Substring(0, sp); tail = template.Substring(sp + 1); }
+        }
+
+        // Substitute placeholders Windows understands; if the template has
+        // no placeholder, append the URL as the final argument.
+        bool substituted = false;
+        foreach (var ph in new[] { "%1", "%L", "\"%1\"", "\"%L\"" })
+        {
+            if (tail.Contains(ph))
+            {
+                tail = tail.Replace(ph, $"\"{fileUrl}\"");
+                substituted = true;
+            }
+        }
+        if (!substituted)
+        {
+            tail = (tail.Length == 0 ? "" : tail + " ") + $"\"{fileUrl}\"";
+        }
+        return (exe, tail);
     }
 
     private static string Render(SessionReport r)

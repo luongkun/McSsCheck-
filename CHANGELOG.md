@@ -4,6 +4,47 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.6] — 2026-05
+
+Hotfix for the "Internet Explorer 11 is no longer supported" popup some
+users hit on Windows Server / locked-down VMs when clicking **Open HTML
+report**. On those machines, Windows still has IE11 wired up as the
+default handler for `.html`, so the v0.9.5 shell-execute call ended up
+in IE, which Microsoft retired in 2022 and which now only shows the
+popup instead of rendering anything.
+
+### Changed
+
+- **`HtmlReportRenderer.OpenInBrowser`** no longer relies on
+  `ProcessStartInfo.UseShellExecute = true`. Instead it walks a
+  four-step fallback ladder that skips IE entirely:
+  1. Resolve the user's `UserChoice` ProgId from the registry for
+     `.html`, `.htm`, `http://`, and `https://` — in that order.
+     Any ProgId that looks like Internet Explorer
+     (`IE.*`, `Iexplore.*`, `InternetExplorer.*`) is skipped, and
+     the remaining ProgId's ShellOpen command is executed directly.
+  2. If no good UserChoice exists, try known install paths of
+     Edge, Chrome, Brave, Firefox, Vivaldi and Opera in that order.
+     Edge is always present on modern Windows, so this step
+     succeeds on any default-imaged machine.
+  3. `explorer.exe <file>` — opens the file through the shell's
+     document-open path (still file-association based but modern
+     Windows almost never routes that to IE).
+  4. `explorer.exe /select,<file>` — last resort: highlight the
+     file in Explorer so the user can drag it into a browser
+     window manually.
+- **GUI: new "Show in folder" button** next to "Open HTML report".
+  It calls the new `HtmlReportRenderer.ShowInFolder(path)` helper
+  and pops Explorer open at the report with the file selected.
+  Useful when the player has a non-standard browser that the
+  fallback ladder hasn't heard of.
+
+### Compatibility
+
+- No flag changes. CLI surface identical to v0.9.5.
+- Existing HTML reports from older versions still open the same way
+  (the fallback change is 100% on the launching side).
+
 ## [0.9.5] — 2026-05
 
 Detection-upgrade + housekeeping release. Two themes:
