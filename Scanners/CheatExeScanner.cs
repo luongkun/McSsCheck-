@@ -218,36 +218,11 @@ internal static class CheatExeScanner
     }
 
     /// <summary>
-    /// Pull the user-controlled folders we want to walk. Distinct() collapses
-    /// the cases where %TEMP% and %LOCALAPPDATA%\Temp resolve to the same
-    /// path, etc.
+    /// Pull the user-controlled folders we want to walk. Collapsed into a
+    /// shared helper in <see cref="UserFolders"/> so duplicate lists across
+    /// scanners can't drift apart.
     /// </summary>
-    private static List<string> CollectRoots()
-    {
-        var profile  = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var desktop  = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        var docs     = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        var appdata  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var local    = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var dl       = string.IsNullOrEmpty(profile) ? "" : Path.Combine(profile, "Downloads");
-        var temp     = Path.GetTempPath();
-        var pubDir   = Environment.GetEnvironmentVariable("PUBLIC") ?? @"C:\Users\Public";
-
-        var candidates = new[] { desktop, docs, dl, temp, pubDir, appdata, local, profile };
-
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var roots = new List<string>();
-        foreach (var c in candidates)
-        {
-            if (string.IsNullOrEmpty(c)) continue;
-            string norm;
-            try { norm = Path.GetFullPath(c).TrimEnd('\\'); }
-            catch { continue; }
-            if (!Directory.Exists(norm)) continue;
-            if (seen.Add(norm)) roots.Add(norm);
-        }
-        return roots;
-    }
+    private static List<string> CollectRoots() => UserFolders.GetDefaultRoots();
 
     /// <summary>
     /// Scan the file itself plus, when it's a zip / jar, up to the first

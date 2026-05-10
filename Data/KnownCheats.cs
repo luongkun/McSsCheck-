@@ -75,6 +75,28 @@ internal static class KnownCheats
         "javaagent", "agent.jar", "injector", "hacked-client",
         "loader-1", "ldr-loader", "boot-loader.jar", "bootstrap-",
         "transformer-cheat", "weave-loader", "weave-mod", "weaveloader",
+
+        // 2025-2026 cheat clients seen on screenshare (added v0.9.5)
+        "koid", "koid-client", "koidclient",
+        "atermys", "atermys-client", "atermysclient", "atermys-loader",
+        "slinky", "slinky-gg", "slinkyloader", "slinky-loader",
+        "pluto", "plutosolutions", "pluto-solutions",
+        "orion-client", "orionclient", "orion-loader",
+        "zenith-client", "zenithclient",
+        "vivid-client", "vividclient",
+        "solaris-client", "solarisclient",
+        "trident-client", "tridentclient",
+        "nexus-client", "nexusclient",
+        "astrolabe", "astrolabe-client",
+        "venom-client", "venomclient",
+        "mistral-client", "mistralclient",
+        "raptor-client", "raptorclient",
+        "inferno-client", "infernoclient",
+        "polaris-client", "polarisclient",
+        "eclipse-cheat", "eclipsecheat",
+        "obsidian-client", "obsidianclient",
+        "titan-client", "titanclient", "titan-loader",
+        "thunder-client-mc", "thunderclient-mc",
     };
 
     /// <summary>
@@ -134,6 +156,27 @@ internal static class KnownCheats
         "/liquidbounce",
         "/rusherhack",
         "/bleach-hack",
+
+        // 2025-2026 distribution sites / Telegram mirrors (added v0.9.5)
+        "slinky.gg",
+        "t.me/plutosolutions",
+        "plutosolutions.com",
+        "atermys.com",
+        "atermys.gg",
+        "atermys.cc",
+        "koidclient.com",
+        "koid.gg",
+        "orion-client.com",
+        "zenithclient.cc",
+        "vividclient.cc",
+        "solarisclient.org",
+        "tridentclient.cc",
+        "nexusclient.cc",
+        "venomclient.cc",
+        "infernoclient.cc",
+        "obsidianclient.cc",
+        "titan-client.cc",
+        "eclipsecheat.io",
     };
 
     /// <summary>
@@ -160,6 +203,14 @@ internal static class KnownCheats
         "modules/exploit/", "modules/world/", "modules/player/",
         "obfuscated/aaaa", "obfuscated/bbbb",
         "cheat/module", "cheat/modules", "client/module",
+
+        // Java agent-class path fragments that routinely appear in cheat
+        // agents (added v0.9.5). These are package-path substrings — we
+        // match them against zip entry names (MinecraftScanner) and
+        // agent-class attribute values (JavaAgentScanner).
+        "net/java/f/", "dev/koid/", "gg/slinky/", "net/atermys/",
+        "premain", "agentmain", "lang/instrument/",
+        "net/weavemc/", "net/doomsday/", "com/atermys/",
     };
 
     /// <summary>

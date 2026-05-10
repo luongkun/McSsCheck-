@@ -158,6 +158,8 @@ McSsCheck.exe --no-html             # do not generate / open HTML report
 McSsCheck.exe --report-only         # do not pause for Enter at end
 McSsCheck.exe --vt-key <KEY>        # VirusTotal v3 API key (alt: VT_API_KEY env)
 McSsCheck.exe --html-path <PATH>    # write HTML report to a specific file
+McSsCheck.exe --no-exe-scan         # skip cheat-exe renamed-cheat hash/marker scan
+McSsCheck.exe --no-agent-scan       # skip Java-agent manifest scan
 McSsCheck.exe --help                # show all flags
 ```
 
@@ -179,6 +181,31 @@ McSsCheck.exe --help                # show all flags
    the hash is sent — never the file**. Free-tier keys are limited to
    ~4 req/min and 500/day, so the tool throttles itself and caps at 24
    lookups per session.
+
+## What's new in v0.9.5
+
+- **New `JavaAgentScanner`.** Reads `META-INF/MANIFEST.MF` from
+  every `.jar` in the scoped folders (`.minecraft/mods/`, `versions/`,
+  Desktop, Downloads, Documents, Public, AppData, LocalAppData,
+  %TEMP%, profile root) and flags jars that declare
+  `Premain-Class` or `Agent-Class`. Legitimate Minecraft mods never
+  declare a JVM-level Java agent — every cheat-agent family does
+  (Doomsday, Weave, Koid, rebuilt Atermys, …). Catches renamed /
+  repacked cheat agents that filename-based scanners miss. Disable
+  with `--no-agent-scan`.
+- **Cheat database expanded** — ~25 new client keywords covering
+  2025-2026 clients (Koid, Atermys, Slinky.gg / Pluto Solutions,
+  Orion, Zenith, Vivid, Solaris, Trident, Nexus, Astrolabe, Venom,
+  Mistral, Raptor, Inferno, Polaris, Eclipse, Obsidian, Titan,
+  Thunder), ~18 new distribution domains, new Java-agent package-path
+  fragments (`net/java/f/`, `dev/koid/`, `gg/slinky/`, …), and new
+  binary markers for Koid / Weave / Orion / Zenith / extra Atermys
+  and Slinky builds / Doomsday's `net.java.f` premain signature.
+- **Internal tidy.** Tokenizer + user-folder list + manifest parser
+  live in one helper class each (`Util/CmdlineTokenizer`,
+  `Util/UserFolders`, `Util/JarManifestInspector`); the two-to-three
+  scattered copies that existed in the scanner files have been
+  deleted.
 
 ## What's new in v0.7.0
 

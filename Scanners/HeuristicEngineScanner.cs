@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
@@ -228,15 +227,7 @@ internal static class HeuristicEngineScanner
 
     private static void AdsScriptStreamModification(SessionReport.Section section)
     {
-        var profile  = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var desktop  = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        var docs     = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        var dl       = Path.Combine(profile, "Downloads");
-        var appdata  = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var mc       = Path.Combine(appdata, ".minecraft");
-
-        var roots = new[] { desktop, docs, dl, mc, profile }
-            .Where(Directory.Exists).Distinct().ToList();
+        var roots = UserFolders.GetDropFolders();
 
         var exts = new[] { ".bat", ".cmd", ".ps1", ".jar", ".vbs", ".js" };
         int scanned = 0, flagged = 0;

@@ -4,6 +4,89 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.5] — 2026-05
+
+Detection-upgrade + housekeeping release. Two themes:
+1. Catch more cheats — in particular the "javaagent" family
+   (Doomsday, Weave, Koid, rebuilt Atermys jars, …) that survives
+   every name-based check because the filename can be anything.
+2. De-duplicate scanner plumbing that had accumulated — three
+   copies of a quote-aware cmdline tokenizer, two copies of the
+   "user-controlled folders" list, and scattered manifest-parsing
+   bits.
+
+### Added
+
+- **`JavaAgentScanner`** — new scanner, enabled by default.
+  Reads `META-INF/MANIFEST.MF` from every `.jar` in the scoped
+  folders (Desktop / Downloads / Documents / Public / AppData /
+  LocalAppData / %TEMP% / profile root **and** `.minecraft/mods/`
+  + `.minecraft/versions/`) and flags jars that declare
+  `Premain-Class` or `Agent-Class`. Legitimate Minecraft mods
+  (Fabric / Forge / NeoForge / Quilt / vanilla) never declare a
+  JVM-level agent — every cheat-agent family we've seen does.
+  One card per jar, tagged `java-agent` + `manifest-agent` (plus
+  any cheat-keyword tag that matched the agent class / main class
+  / filename) so the HTML report's cross-source dedup collapses
+  it with the matching Process / Recent / Registry hits.
+- **`--no-agent-scan` CLI flag** — opt out of the new scanner,
+  mirroring the existing `--no-exe-scan` / `--no-*` knobs.
+- **`JarManifestInspector`** utility — the shared MANIFEST.MF
+  parser (handles continuation lines and the CRLF/CR/LF delimiter
+  soup) used by the new scanner. Public helpers: `Read(jarPath)`
+  and `IsJavaAgent(manifest)`.
+
+### Detection database expansion
+
+- `KnownCheats.NameKeywords` — **~25 new entries** covering
+  2025-2026 clients and loaders seen on screenshare: Koid,
+  Atermys, Slinky.gg / Pluto Solutions, Orion, Zenith, Vivid,
+  Solaris, Trident, Nexus, Astrolabe, Venom, Mistral, Raptor,
+  Inferno, Polaris, Eclipse, Obsidian, Titan, Thunder client.
+- `KnownCheats.CheatDomains` — **~18 new entries** (slinky.gg,
+  t.me/plutosolutions, atermys.{com,gg,cc}, koidclient.com,
+  orion-client.com, zenithclient.cc, vividclient.cc,
+  solarisclient.org, tridentclient.cc, nexusclient.cc,
+  venomclient.cc, infernoclient.cc, obsidianclient.cc,
+  titan-client.cc, eclipsecheat.io, …).
+- `KnownCheats.InternalKeywords` — **new package-path fragments**
+  that appear inside cheat agent jars (`net/java/f/`, `dev/koid/`,
+  `gg/slinky/`, `net/atermys/`, `com/atermys/`, `net/weavemc/`,
+  `net/doomsday/`) plus the agent-bootstrap strings (`premain`,
+  `agentmain`, `lang/instrument/`). Catches obfuscated jars whose
+  class names are scrambled but whose package path leaks.
+- `CheatFingerprints.BinaryMarkers` — **new markers for Koid,
+  Weave Loader, Orion, Zenith**, plus extra banners for Atermys
+  (overlay title, config header), Slinky.gg (`SlinkyInjector`,
+  `slinky_config`) and Doomsday's `net.java.f` premain-class
+  signature.
+
+### Changed (tidying)
+
+- **`Util/CmdlineTokenizer`** — new helper; single quote-aware
+  cmdline tokenizer used by `ProcessScanner`, `LiveJvmScanner`.
+  The three identical local copies have been deleted.
+- **`Util/UserFolders`** — new helper; returns the user-scoped
+  folder list (with `GetDefaultRoots()` and a lighter
+  `GetDropFolders()` variant for the ADS heuristic).
+  `CheatExeScanner.CollectRoots` and
+  `HeuristicEngineScanner.AdsScriptStreamModification` now call
+  it instead of re-building the list twice, so they can never
+  drift apart again.
+- Version in `McSsCheck.csproj`, assembly version, file version
+  and informational version bumped to **0.9.5** — the live-wired
+  value shows up automatically in the HTTP `User-Agent` of the
+  Modrinth / VirusTotal clients and in the HTML report header.
+
+### Compatibility
+
+- No breaking changes. CLI surface is identical to v0.9.4 except
+  for the new opt-out `--no-agent-scan` flag.
+- The new scanner is opt-out: omit the flag to use it (default),
+  pass it to skip.
+- The DB expansions only add new entries; nothing removed.
+  Existing reports and tag-based dedup keep working as before.
+
 ## [0.9.4] — 2026-05
 
 Visibility patch on top of v0.9.3. Two complaints from the first

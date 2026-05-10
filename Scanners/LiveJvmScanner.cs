@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
-using System.Text;
 using McSsCheck.Data;
 using McSsCheck.Models;
 using McSsCheck.Util;
@@ -121,7 +120,7 @@ internal static class LiveJvmScanner
     {
         var jars = new List<string>();
         if (string.IsNullOrEmpty(cmd)) return jars;
-        var tokens = TokenizeCmdline(cmd).ToList();
+        var tokens = CmdlineTokenizer.Tokenize(cmd).ToList();
         for (int i = 0; i < tokens.Count - 1; i++)
         {
             if (tokens[i].Equals("-cp", StringComparison.OrdinalIgnoreCase) ||
@@ -139,7 +138,7 @@ internal static class LiveJvmScanner
     private static string? ExtractMainClass(string? cmd)
     {
         if (string.IsNullOrEmpty(cmd)) return null;
-        var toks = TokenizeCmdline(cmd).ToList();
+        var toks = CmdlineTokenizer.Tokenize(cmd).ToList();
         // Main class is the first non-flag token after -cp / -jar / a final standalone arg.
         for (int i = 0; i < toks.Count; i++)
         {
@@ -343,23 +342,5 @@ internal static class LiveJvmScanner
                 ConsoleUI.Dim($"  cannot enumerate {modsDir}: {ex.Message}");
             }
         }
-    }
-
-    private static IEnumerable<string> TokenizeCmdline(string? cmd)
-    {
-        if (string.IsNullOrEmpty(cmd)) yield break;
-        var current = new StringBuilder();
-        bool inQuotes = false;
-        foreach (var c in cmd)
-        {
-            if (c == '"') { inQuotes = !inQuotes; continue; }
-            if (char.IsWhiteSpace(c) && !inQuotes)
-            {
-                if (current.Length > 0) { yield return current.ToString(); current.Clear(); }
-                continue;
-            }
-            current.Append(c);
-        }
-        if (current.Length > 0) yield return current.ToString();
     }
 }
