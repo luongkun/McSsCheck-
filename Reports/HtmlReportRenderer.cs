@@ -300,13 +300,29 @@ internal static class HtmlReportRenderer
 
         // Substitute placeholders Windows understands; if the template has
         // no placeholder, append the URL as the final argument.
+        //
+        // Order matters: try the **already-quoted** forms (`"%1"`, `"%L"`,
+        // `"%l"`) before the bare ones, otherwise a template like
+        // `chrome.exe --single-argument "%1"` would have its inner `%1`
+        // matched first and replaced with `"file:///..."`, leaving the
+        // outer quotes untouched: `--single-argument ""file:///...""`.
+        // Chrome's `--single-argument` flag treats the rest of the raw
+        // command line verbatim, so the surplus quotes leak straight into
+        // the address bar (e.g. `"file///..."`) and Chrome treats it as a
+        // search query — which is the IE11-popup-replaced regression
+        // some users hit on Windows 10 / Server VMs.
+        //
+        // Stop after the first match so we don't accidentally substitute
+        // the same URL twice for templates that mention both `%1` and
+        // `%L` (rare but legal in Windows registry).
         bool substituted = false;
-        foreach (var ph in new[] { "%1", "%L", "\"%1\"", "\"%L\"" })
+        foreach (var ph in new[] { "\"%1\"", "\"%L\"", "\"%l\"", "%1", "%L", "%l" })
         {
             if (tail.Contains(ph))
             {
                 tail = tail.Replace(ph, $"\"{fileUrl}\"");
                 substituted = true;
+                break;
             }
         }
         if (!substituted)
