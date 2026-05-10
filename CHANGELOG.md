@@ -4,6 +4,38 @@ All notable changes to **McSsCheck** are listed here. Format inspired by
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.9.7] — 2026-05
+
+Follow-up hotfix to v0.9.6. On machines whose default `.html` UserChoice
+ProgId points at a browser whose ShellOpen template wraps `%1` in
+quotes — e.g. Chrome's `"...chrome.exe" --single-argument "%1"` or
+Firefox's `"...firefox.exe" -osint -url "%1"` — clicking **Open HTML
+report** would land in the browser's address bar with a literal pair of
+surrounding double-quotes (e.g. `"file///C:/Users/.../mcss-report-...html"`).
+Chrome treated the quoted blob as a search query and showed
+`DNS_PROBE_FINISHED_NXDOMAIN` instead of opening the report.
+
+### Fixed
+
+- **`HtmlReportRenderer.SplitCommandLine`** now matches the
+  already-quoted placeholder forms (`"%1"`, `"%L"`, `"%l"`) **before**
+  the bare ones (`%1`, `%L`, `%l`), and stops after the first match.
+  Previously the bare `%1` was found first inside `"%1"`, replaced with
+  `"file:///..."`, and the outer quotes were left untouched — producing
+  `--single-argument ""file:///...""`. Chrome's `--single-argument` flag
+  preserves the rest of the raw command line verbatim, so the surplus
+  quotes leaked straight into the address bar. Reorder + early `break`
+  fixes both Chrome and any other browser whose UserChoice ProgId wraps
+  `%1` in quotes.
+- The substitution loop also accepts lowercase `%l`, which a few
+  non-default associations use.
+
+### Compatibility
+
+- No flag changes. CLI surface identical to v0.9.6.
+- Existing HTML reports from older versions still open the same way
+  (the fix is 100% on the launching side).
+
 ## [0.9.6] — 2026-05
 
 Hotfix for the "Internet Explorer 11 is no longer supported" popup some
